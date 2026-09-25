@@ -1,0 +1,171 @@
+\section{Negative results and limitations}
+\label{sec:limits}
+
+We keep negative results, failed runs and reruns in the record. This section collects them.
+
+\subsection{Negative results}
+
+\paragraph{Training increased susceptibility to wrong-answer injection.}
+The pooled attack success of a sentence naming a wrong answer rose from 21.0\% to 39.4\%
+(Section~\ref{sec:injection}), even though training included an injection-detection task. This
+is the most important open problem for the tasks Bobcat targets, several of which read
+untrusted input. A structurally closed output does not help here.
+
+\paragraph{The residual pointer head was not adopted.}
+In joint training the pointer's scale stayed at zero (Section~\ref{sec:arms}). We therefore
+retested it with the backbone and any adapter frozen and run without gradients, training only
+the head for one epoch (1,592 steps of 32 questions, head learning rate $10^{-3}$) with the
+scale initialized at 1.0 (Table~\ref{tab:pointer}). On the frozen base model the pointer adds
+about one point (+1.1 [+0.1, +2.1] over zero-shot), against +7.9 for LoRA, and it reduced its own
+scale from 1.0 to 0.016. On top of \expone{} it costs 2.1 points ([$-2.9$, $-1.2$]) and makes
+the model strongly overconfident (NLL 0.770; fitted temperature 3.96). In both cases it hurts
+255-candidate title selection (base 65.3\% to 60.0\%; \expone{} 81.3\% to 57.3\%). Our
+explanation is that the training data contain few long candidate lists, so a bilinear score
+between candidate end states does not generalize to long lists. Retesting a candidate
+comparison structure first needs training data with long lists and a normalization that is
+invariant to the number of candidates.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Pointer head retest on the development split (head-only training, scale initialized
+at 1.0). $\Delta$ in points with 95\% paired component-bootstrap intervals; the reference arm
+is named in each row.}
+\label{tab:pointer}
+\setlength{\tabcolsep}{3.5pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}lrllrrrrrrr@{}}
+\toprule
+Arm & Macro & $\Delta$ [95\%] & Against & Tool & NLL & $T$ & ECE@$T$ & Monitor & K255 & Scale \\
+\midrule
+Zero-shot (reference) & 85.5 & -- & -- & 81.8 & 0.526 & 1.26 & 0.045 & 83.1 & 65.3 & -- \\
+Pointer only, base frozen & 86.6 & +1.1 [+0.1, +2.1] & zero-shot & 80.7 & 0.486 & 1.40 & 0.028 & 87.6 & 60.0 & 0.016 \\
+\expone{} (LoRA SFT) & 93.4 & +7.9 [+6.8, +9.0] & zero-shot & 95.0 & 0.236 & 1.15 & 0.011 & 95.5 & 81.3 & -- \\
+\expone{} + pointer, frozen & 91.3 & $-2.1$ [$-2.9$, $-1.2$] & \expone{} & 93.4 & 0.770 & 3.96 & 0.037 & 94.5 & 57.3 & 0.224 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{Reinforcement learning gave no accuracy gain.}
+On the student, RL, Brier and CE continuations are indistinguishable in accuracy
+(Table~\ref{tab:continuation}); on the GLM reference, proper-score RL and direct Brier tied at
+802 of 896 (Section~\ref{sec:glmrl}). This matches the proposition of
+Section~\ref{sec:objectives}: with gold labels, the RL estimator carries no information that
+the Brier loss lacks. Both results are single-seed. We did not test RL in the setting where
+it could add something, with outcome rewards and no gold labels.
+
+\paragraph{Smaller regressions.}
+On the ten unseen tool situations, scope judgments were 2.8 points below the untrained model
+(71 rows). Title selection with many candidates improved but remains the weakest part of
+search (73.7\% at $K=255$ on the final split).
+
+\subsection{Evaluation limitations}
+
+\paragraph{No human review.}
+No label of the six-task evaluation has been reviewed by a person, including the 300 rows
+that the builder itself flagged as needing review and the classification labels, which we
+know to be noisy. The author-written probes and the ten unseen tool situations were written
+and labelled by an AI assistant (Claude) and have not been reviewed either; they are sanity
+checks.
+
+\paragraph{Language coverage.}
+The product evaluation is Korean only. English enters only through 63 probe questions, so we
+cannot report per-language results for the product tasks, although our own rules require it.
+
+\paragraph{Few independent units for the held-out task.}
+The final tool-call result rests on three situations (96 decisions) and the development
+result on six. The component bootstrap cannot capture situation-level variation with so few
+clusters.
+
+\paragraph{In-distribution gains.}
+Five of the six tasks share generators with the training data (with disjoint components), and
+citation verification at 99.8\% (development) and 100.0\% (final) may partly reflect the model
+learning the generator's rules. Only the tool-call task measures transfer to an unseen task.
+
+\paragraph{Identifier confound.}
+Title questions with 77 or more candidates use different identifiers from those with at most
+62 (Section~\ref{sec:identifiers}), so candidate count and identifier choice are confounded in
+all $K$ results.
+
+\paragraph{No Score evaluation.}
+The product evaluation has no Score primitive. Score behaviour is measured only on the
+training-distribution monitor split (normalized MAE) and in ten probe questions.
+
+\subsection{Missing reference and release gates}
+\label{sec:gates}
+
+The project's specification defines release gates G0 to G9. The quality reference for G1,
+G2 and G9 is the GLM-5.3-Flash direct-logit readout on the same evaluation (baseline B0),
+which has not been run. Table~\ref{tab:gates} gives the status of each gate as far as this
+paper can speak to it. No gate is claimed as passed.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Status of the specification's release gates. ``Not judged'' means the required
+measurement does not exist yet.}
+\label{tab:gates}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lp{4.6cm}p{7.2cm}@{}}
+\toprule
+Gate & Requirement (abridged) & Status \\
+\midrule
+G0 & Non-generative path, closed serializer, fixed attack corpus on the release artifact, fault injection & Structural part observed on \expone{} (merged) and the base model with zero violations (Section~\ref{sec:structural}); fault injection tested earlier on the GLM path; the hosted endpoint and network boundary not tested. Semantic attack success reported separately. \\
+G1 & Paired 95\% lower bound of the macro difference to GLM direct-logit $> -1$ point & Not judged: reference not run. \\
+G2 & G1 in each evaluation language & Not judged: reference not run; no English product evaluation. \\
+G3 & ECE $\le 0.05$ per language, NLL and Brier against the reference & Korean final ECE 0.011 at $T$; English not measured; reference not run. \\
+G4 & Abstention policy: coverage $\ge 50\%$, selected-error upper bound $\le 2\%$ & Not evaluated. \\
+G5 & 77/200/255 candidates without truncation; flip rate $\le 2\%$; permutation TV p95 $\le 0.05$ & 255 candidates handled without truncation; order stability measured with a different statistic (Section~\ref{sec:permutation}); not judged. \\
+G6 & Isolation, cache on/off, batch/standalone, resume, with tolerances fixed in advance & Batch and shared-prefix agreement measured (Table~\ref{tab:determinism}); tolerances not fixed in advance; sibling-change and resume tests not run for \expone{}. \\
+G7 & W1 warm p50 $\le 150$\,ms, p95 $\le 300$\,ms on a deployment that passed quality & Latency target met on one B300 (97 / 98\,ms HTTP, merged LoRA) and on one H100 with vLLM FP8 (50 / 50\,ms at the engine call); the deployment has not passed the quality gates. \\
+G8 & Pre-registered task criteria in both languages, fresh-install reproduction, consistent artifacts & Not met. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Model size and serving artifact}
+
+The deployed backbone has 27.8B parameters and peaks at 56.5\,GB in serving, above the 1 to
+8B dense target of our specification; Gemma-4-12B-it and Qwen3.5-9B remain candidates for the
+same training. The merged BF16 model used for the B300 serving measurements differs from the
+evaluated unmerged model on 1.4\% of answers (Section~\ref{sec:determinism}), and the merged FP8
+artifact of our internal deployment differs on 1.7\% of development answers
+(Section~\ref{sec:engine_quality}); neither has a sealed-final result of its own. Latency was measured without the network and not under
+concurrent load (Sections~\ref{sec:serving} and~\ref{sec:engine}); on TypeSafe's workflow
+examples the served model is 3 to 19 times slower per case than the times TypeSafe published
+for Jev (Section~\ref{sec:jev}).
+
+\subsection{Operations: failures and reruns}
+\label{sec:ops}
+
+Appendix~\ref{app:compute} lists the compute behind each result. The following failures
+occurred; none changed a reported result
+except as stated.
+\begin{itemize}
+  \item \textbf{Evaluation v1.} The first readout ran on the flawed v1 evaluation
+    (Section~\ref{sec:v1bug}); its results are kept separately and not used.
+  \item \textbf{Backbone comparison.} A virtual environment that inherited system packages
+    replaced Torch and crashed on import; the job was changed to use the image's environment
+    and to refuse Torch replacement. An FP8 checkpoint tried to download kernels from the
+    model hub; we declined to run third-party binaries on a host with storage permissions and
+    used the BF16 weights. This exposed a bug that counted a loader error as 3,188 row
+    failures; afterwards only over-length inputs count as row failures. Single 80\,GB GPUs
+    were unavailable, so we used four-GPU L40S hosts. One large host idled for about 3.2
+    hours after its job ended.
+  \item \textbf{DeepSeek-V4.1-Flash.} A dependency check's regular expression mistook a new
+    dependency for a Torch replacement and stopped the first attempt, after which the host
+    shut down as designed. The second attempt hit a version conflict between two
+    kernel libraries and a missing launcher on the path; both were fixed on the same host.
+    36 rows returned NaN logits, of unknown cause, and count as failures.
+  \item \textbf{Training.} We once judged the baseline process finished while it was still
+    writing; results were unaffected. The convolution path ran without
+    \texttt{causal\_conv1d}.
+  \item \textbf{Sealed final and stress.} The first host finished and uploaded the final
+    evaluation, then a post-processing error failed the job; the host powered itself off and
+    the probe and benchmark results on its local disk were lost. The job script now
+    uploads each result as soon as it exists and no longer fails on post-processing errors.
+    The final evaluation was not rerun (the script refuses to rerun it when a final result
+    exists); a second host reran only the probes, benchmarks and pointer retest. The first
+    attempt to obtain that host failed for lack of capacity.
+\end{itemize}

@@ -1,0 +1,48 @@
+{
+  "schema": "bobcat-corpus-sources-v1",
+  "pinned_at": "2026-09-22",
+  "selection": "two shards per source, shuffle seed 20260922; selected before model outcomes",
+  "license_scope": "Dataset attribution licence. Underlying web documents retain their rights; do not republish raw documents as owned content. Preserve Common Crawl and source dataset notices.",
+  "sources": [
+    {
+      "id": "fineweb2-ko",
+      "repo": "HuggingFaceFW/fineweb-2",
+      "revision": "af9c13333eb981300149d5ca60a8e9d659b276b9",
+      "language": "ko",
+      "license": "ODC-BY-1.0",
+      "upstream_split": "train",
+      "files": [
+        {
+          "path": "data/kor_Hang/train/002_00003.parquet",
+          "bytes": 4844849008,
+          "sha256": "b24393360a123d2d2675d4377d33a37a74140aaa47dd0ee9b6a84f5dc018ff63"
+        },
+        {
+          "path": "data/kor_Hang/train/002_00002.parquet",
+          "bytes": 4843928570,
+          "sha256": "57edee98ec9ff728e2c499e78fb30888a21c1599912bef00a17730e811fdcff3"
+        }
+      ]
+    },
+    {
+      "id": "fineweb-edu-en",
+      "repo": "HuggingFaceFW/fineweb-edu",
+      "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+      "language": "en",
+      "license": "ODC-BY-1.0",
+      "upstream_split": "train",
+      "files": [
+        {
+          "path": "sample/10BT/002_00000.parquet",
+          "bytes": 2151796315,
+          "sha256": "547ae182d132c9f06b6ce63149567208ea9f57630bfd9b1a2938e504f0c9ebd7"
+        },
+        {
+          "path": "sample/10BT/009_00000.parquet",
+          "bytes": 2151913277,
+          "sha256": "f836cd3c70b95776699eb6c356b2dbf702816e25dcf39992f5c80a29029d23c3"
+        }
+      ]
+    }
+  ]
+}

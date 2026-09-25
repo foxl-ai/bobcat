@@ -1,0 +1,19 @@
+{
+  "architecture": "shared",
+  "vocab_size": 64000,
+  "d_model": 1024,
+  "n_heads": 16,
+  "encoder_layers": 24,
+  "schema_layers": 12,
+  "reader_blocks": 4,
+  "reader_passes": 1,
+  "candidate_pooling": "candidate_mean",
+  "joint_layers": 29,
+  "ff_mult": 4,
+  "dropout": 0.1,
+  "max_context_tokens": 2048,
+  "max_schema_tokens": 512,
+  "max_joint_tokens": 4096,
+  "activation_checkpointing": false,
+  "mlm_transform": true
+}

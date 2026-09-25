@@ -1,0 +1,93 @@
+\section{Problem and interface}
+\label{sec:interface}
+
+\subsection{Requests}
+
+A request is a JSON object with exactly three top-level fields: \texttt{model}, \texttt{state}
+and \texttt{questions}. The state is a string, an object or an array; its structure and key
+order are passed to the model unchanged. \texttt{questions} maps between 1 and 128
+caller-chosen question identifiers to typed questions. Each question has a \texttt{type},
+optional \texttt{instructions} and \texttt{criteria}:
+\begin{itemize}
+  \item \textbf{Choice}: a map of 1 to 255 candidate names to descriptions. Both the name
+    and the description are model input, so a name such as \texttt{overreach} carries
+    meaning.
+  \item \textbf{Noul}: optional descriptions of what \texttt{true} and \texttt{false} mean.
+  \item \textbf{Score}: an ordered array of 1 to 10 levels; level indices start at 0.
+\end{itemize}
+Fields that could open a generation path (\texttt{messages}, \texttt{tools},
+\texttt{stream}, \texttt{response\_format}, \texttt{max\_new\_tokens}) are rejected, as are
+duplicate object keys, non-finite JSON constants and invalid UTF-8. An input that exceeds a
+model limit is refused with HTTP 422; it is never truncated, and candidates are never
+dropped.
+
+\subsection{Responses}
+
+The reply contains \texttt{model}, \texttt{usage} and one answer per question identifier.
+\begin{itemize}
+  \item \textbf{Choice}: \texttt{choice} is the argmax of the returned distribution, with
+    exact ties broken by request order; \texttt{probabilities} covers every requested
+    name exactly once and sums to one; \texttt{confidence} is defined below.
+  \item \textbf{Noul}: \texttt{noul} is $P(\text{true})$ and nothing else. As a hard
+    decision, \emph{true} is taken only if $P(\text{true}) > 0.5$.
+  \item \textbf{Score}: \texttt{score} is the expected level $\sum_i i\,p_i$ (not rounded),
+    \texttt{legend} restores the caller's levels, and \texttt{probabilities} and
+    \texttt{confidence} are as for Choice.
+\end{itemize}
+No answer adds candidates that were not requested (for example \texttt{none} or
+\texttt{defer}); a caller who needs such an option includes it in the criteria.
+\texttt{usage.output\_tokens} is always 0: Bobcat's definition of output tokens counts
+generated tokens, of which there are none.
+
+\subsection{The reported confidence value}
+\label{sec:confidence}
+
+For compatibility, Bobcat reports the concentration statistic of TypeSafe's public adapter
+\citep{typesafe_adapter}, fixed as profile \texttt{typesafe\_adapter\_2026\_09\_22}. For a
+Choice with $K$ candidates and largest probability $p_{\max}$,
+\begin{equation}
+  \mathrm{conf}_{\text{choice}} = \frac{p_{\max} - 1/K}{1 - 1/K}, \qquad K > 1,
+\end{equation}
+and for a Score with first modal level $m$,
+\begin{equation}
+  \mathrm{conf}_{\text{score}} = \max\!\left(0,\; 1 - \frac{D}{U}\right), \quad
+  D = \sum_i p_i\,|i-m|, \quad U = \frac{1}{K}\sum_{i=0}^{K-1}\left|i-\frac{K-1}{2}\right|,
+\end{equation}
+with confidence 1 when $K=1$. This value summarizes the shape of the returned distribution;
+it is not a probability that the answer is correct. With three candidates and
+$p_{\max}=0.8$, for example, it is 0.7. Every accuracy and calibration metric in this paper
+uses the returned probabilities, never this field.
+
+\subsection{A closed output contract}
+\label{sec:contract}
+
+We require that no prompt can make the public decision path emit anything other than typed
+numbers (gate G0 of our specification). The design does not rely on the prompt for this.
+\begin{enumerate}
+  \item The model's only output is a vector of logits for the offered identifiers at one
+    position (Section~\ref{sec:readout}). No token is sampled, decoded or returned on the
+    research serving path used for every measurement in this paper.
+  \item The host keeps the original request. It builds each answer from the caller's own
+    candidate names, Score legend and question identifiers, using the probabilities
+    computed from the logit vector.
+  \item A validator that does not depend on the backend checks the reply before it is
+    serialized: the closed field set, the requested identifiers, finite probabilities that
+    sum to one, argmax consistency, the Score expectation and legend, and integer usage with
+    zero output tokens.
+  \item Any backend string, non-finite value, missing or extra candidate, or exception
+    becomes a fixed JSON error (HTTP 500) that forwards no engine text or traceback.
+    Input and limit errors are JSON 422.
+\end{enumerate}
+The reply therefore has no field in which an explanation, reasoning trace, message or tool
+call could appear. Apart from fixed field names and the model version set by the host, the
+only strings in a successful reply are those the caller supplied.
+This does not make answers correct: a request can still move the numbers, and a typed answer
+can be the wrong valid option. Section~\ref{sec:injection} measures exactly that.
+
+\subsection{Question isolation}
+
+Each question is compiled into its own sequence that contains the state and that question
+only. Question identifiers never enter the model, and a question never sees its siblings.
+Information placed in one question therefore cannot reach another; shared evidence belongs
+in the state. Isolation of computation does not make answers statistically independent, so
+two returned probabilities should not be multiplied as if they were a joint probability.

@@ -1,0 +1,90 @@
+\section{Serving}
+\label{sec:serving}
+
+\subsection{Setup}
+
+We measured \expone{} on one NVIDIA B300 GPU of an eight-GPU node: BF16
+weights with the LoRA merged, transformers 5.17 with SDPA attention and flash-linear-attention
+kernels for the Gated DeltaNet layers, Torch 2.12.1. The \texttt{causal\_conv1d} kernel was
+not installed, and we used no \texttt{torch.compile}, CUDA graphs or quantization. Each
+timing is measured warm: three untimed calls, then 20 timed repetitions (10 for the 8K and
+16K inputs and for W4). HTTP timings use an in-process ASGI test client, so they include
+request parsing, compilation, the model and reply validation, but no network. Each profile
+of W1 to W3 is a single fixed request repeated; W4 uses 32 distinct requests. Our
+specification asks for at least 200 distinct requests per profile, which this measurement
+does not meet, and a 95th percentile from 20 samples is close to the second-largest value.
+The workload question sets are listed in Appendix~\ref{app:prompt}.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Single-B300 latency of \expone{} (BF16, merged LoRA). p50 / p95 in milliseconds.
+``Model only'' excludes HTTP handling. W4 runs independent 1,024-token requests as one static
+batch in one process.}
+\label{tab:serving}
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}llrr@{}}
+\toprule
+Profile & Input & HTTP p50 / p95 & Model-only p50 \\
+\midrule
+W1 & 512 tokens, 8 candidates, 1 question & \textbf{97 / 98} & 96.5 \\
+W2, full & 3.2k-token state, 8 questions (25.5k tokens) & 1,633 / 1,641 & 1,600 \\
+W2, shared prefix & same request, 2,969-token prefix once & \textbf{379 / 380} & 343 \\
+W3, 8K & 8,192 tokens, 1 question & 559 / 560 & 542 \\
+W3, 16K & 16,320 tokens, 1 question & 1,166 / 1,169 & 1,139 \\
+W3, K77 & 77 title candidates (2.1k tokens) & 147 / 148 & 141 \\
+W3, K255 & 255 title candidates (6.6k tokens) & 447 / 449 & 433 \\
+\midrule
+ & & Batch p50 (ms) & Tokens/s \\
+\cmidrule(l){3-4}
+W4, batch 1 & 1,024 tokens & 93 & 11.0k \\
+W4, batch 8 & 8,191 tokens & 515 & 15.9k \\
+W4, batch 16 & 16,383 tokens & 1,019 & 16.1k \\
+W4, batch 32 & 32,766 tokens & 2,054 & 16.0k \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\figfile[width=0.9\linewidth]{figures/latency.pdf}
+\caption{Left: HTTP p50 (bar) and p95 (dot) for each profile; the dashed lines mark the W1
+latency targets of 150\,ms (p50) and 300\,ms (p95), which apply to W1 only. Right: W4
+throughput against static batch size, labelled with the batch p50. One B300 GPU, BF16, merged
+LoRA; warm, 20 timed repetitions (10 for W3 8K/16K and W4); in-process HTTP client (no
+network); one fixed request per profile for W1 to W3.}
+\label{fig:latency}
+\end{figure}
+
+\subsection{Results}
+
+\paragraph{Short requests.}
+W1 (a 512-token request with eight candidates and one question) takes 97\,ms at the median
+and 98\,ms at the 95th percentile (Table~\ref{tab:serving}, Figure~\ref{fig:latency}), within
+the specification's W1 targets of 150\,ms and 300\,ms. The formal gate G7 is defined for a
+deployment that has passed the quality gates, which is not yet established. A 1,024-token
+request (93\,ms) takes about as long as a 512-token request, so at this length fixed
+per-kernel overhead dominates; CUDA graphs or compilation may reduce it.
+
+\paragraph{Shared prefix.}
+For W2 (a 3.2k-token state and eight questions), prefilling the 2,969-token common prefix
+once and branching the hybrid cache (Section~\ref{sec:branching}) reduces the HTTP median from
+1,633\,ms to 379\,ms, a factor of 4.3. Section~\ref{sec:determinism} reports its numerical
+agreement with full sequences.
+
+\paragraph{Long inputs and many candidates.}
+A 16,320-token question takes 1.17\,s at the median; 255 title candidates (6.6k tokens) take
+447\,ms. Peak memory was 56.5\,GB; Section~\ref{sec:engine} serves the same model on an 80\,GB
+H100. The model is also larger than the 1 to 8B dense target of our specification.
+
+\subsection{What was not measured}
+
+W4 is a static batch in one process, not a server with a queue under concurrent load; we
+measured neither queueing latency nor sustained concurrency. Timings exclude the network. We
+did not measure unmerged serving, CUDA graphs, compilation or \texttt{causal\_conv1d} on this
+path; Section~\ref{sec:engine} measures an 80\,GB H100 with vLLM, FP8 quantization and prefix
+caching. The first run of these benchmarks
+was lost with its host (Section~\ref{sec:ops}); values seen on screen during that run agreed
+with the rerun reported here to within about 2\%.

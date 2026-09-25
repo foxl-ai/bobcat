@@ -1,0 +1,14 @@
+{
+  "architecture": "shared",
+  "vocab_size": 2048,
+  "d_model": 128,
+  "n_heads": 4,
+  "encoder_layers": 3,
+  "schema_layers": 1,
+  "reader_blocks": 1,
+  "reader_passes": 2,
+  "joint_layers": 4,
+  "max_context_tokens": 256,
+  "max_schema_tokens": 96,
+  "max_joint_tokens": 512
+}

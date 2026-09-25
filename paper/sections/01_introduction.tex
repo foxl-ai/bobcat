@@ -1,0 +1,127 @@
+\section{Introduction}
+\label{sec:intro}
+
+Many of the decisions that software makes with a language model are small, typed and
+repeated. Which team should receive a support ticket? Does a retrieved passage answer the
+query? Does a cited source support, contradict or say nothing about a claim? Does a coding
+agent's pending shell command go beyond what the user asked for? Does a web page contain
+instructions addressed to the model rather than evidence? Which label of a caller-defined
+taxonomy fits a document? In each case the application defines the admissible answers and
+keeps the policy that acts on the answer (execute, hold, escalate) in its own code. What it
+needs from the model is a probability distribution over those answers, returned quickly and
+in a shape the code can check.
+
+The common way to obtain such a decision from a large language model is to prompt it to
+generate JSON. That route relies on the prompt to keep the output in shape, pays for
+autoregressive decoding, and exposes probabilities only indirectly. \citet{kahneman2011}
+describes fast, automatic judgments as ``System~1'' thinking; TypeSafe uses the name System
+One for a hosted API built around this kind of judgment, served by its Jev model
+\citep{typesafe_blog,typesafe_api}. Its public HTTP contract defines three typed primitives:
+Choice (one of the caller's named candidates), Noul (a probability that a statement is true)
+and Score (a position on an ordered rubric).
+
+This paper describes Bobcat, a typed-decision model and serving contract built on the same
+three primitives. Bobcat does not generate text for a decision. For each question it prefills a
+compiled sequence (sharing the state prefix across questions where possible), reads the logits of the offered candidate identifiers at
+the first answer position, and returns numbers; the host then builds the reply from the
+caller's own candidate names and rubric, and an independent validator refuses any reply
+outside a closed field set. The deployed model is Qwen3.8-27B \citep{qwen38_27b} with a
+LoRA adapter \citep{hu2021lora} trained on labelled decisions, followed by temperature
+calibration \citep{guo2017calibration}.
+
+\paragraph{Relation to TypeSafe and Jev.}
+We use TypeSafe's public HTTP documentation \citep{typesafe_api}, its MIT-licensed Python
+SDK \citep{typesafe_sdk} and its public confidence adapter \citep{typesafe_adapter} as the
+reference for the request and response shape and for the definition of the reported
+\texttt{confidence} value. No output of Jev enters any training,
+distillation, reward or calibration data in this work, and we never called Jev. The only Jev
+output we use is the set of answers TypeSafe itself published for its workflow evaluations
+\citep{typesafe_evals}, as a comparison row (Section~\ref{sec:jev}). Bobcat does not reproduce Jev's decisions, logits,
+tokenizer, token counter or internal architecture; a third-party analysis of that
+architecture \citep{archer_jev} informed some of our diagnostics but none of our claims.
+
+\paragraph{What we measured.}
+We built a six-task evaluation from native Korean sources with component-level splits,
+counterfactual groups and a sealed final split (Section~\ref{sec:data}). We compared eight
+pretrained backbones zero-shot through the same first-position readout
+(Section~\ref{sec:leaderboard}), trained LoRA arms with cross-entropy, Brier and
+proper-score REINFORCE objectives and a residual pointer head (Section~\ref{sec:arms}),
+froze one candidate, \expone, and evaluated it once on the sealed final
+(Section~\ref{sec:final}). We then stressed the served model for structural and numerical
+fixedness and for semantic robustness (Section~\ref{sec:robust}), measured single-GPU
+latency and throughput (Section~\ref{sec:serving}), ran public Korean and English benchmarks
+(Section~\ref{sec:kbench}), and compared the served model with Jev on the workflow examples
+TypeSafe published (Section~\ref{sec:jev}).
+
+\paragraph{Contributions.}
+\begin{itemize}
+  \item A closed output contract for typed decisions in which the only model output is a
+    vector of candidate logits, together with a compiler that keeps untrusted text out of
+    the tokenizer's control vocabulary, assigns verified single-token identifiers, and
+    encodes candidates piecewise so their positions are exact (Sections~\ref{sec:interface}
+    and~\ref{sec:method}).
+  \item A six-task evaluation of 6,400 decisions in 2,328 components, split by component,
+    with 2,193 counterfactual groups and a final split that opens only for a frozen release
+    manifest; and an account of an ordering bug in its first version
+    (Section~\ref{sec:data}).
+  \item Evidence that one epoch of LoRA supervised fine-tuning on a 27.8B hybrid backbone
+    raises sealed-final task-macro accuracy by +10.2 points [+7.7, +12.3] over the same
+    model zero-shot, including on a task that was held out of training, and two
+    reinforcement-learning experiments showing that a proper-score REINFORCE objective,
+    whose expected gradient equals the half Brier gradient (Proposition~1), matches but does
+    not exceed direct Brier training, while correctness-only reward worsens calibration
+    (Section~\ref{sec:experiments}).
+  \item A question-level comparison with Jev on the 20 workflow examples TypeSafe published,
+    scored with one code path for all models and checked for case-selection bias: parity in
+    agreement with TypeSafe's reference, more probability on the reference answer, and a
+    3 to 19 times slower deployment (Section~\ref{sec:jev}).
+  \item Measurements of output fixedness (no structural violation in 12,846 requests,
+    bit-identical repeats, batch and shared-prefix agreement, permutation and distractor
+    stability) alongside a clear negative result: training made the model more willing to
+    follow a wrong answer named inside the state (Section~\ref{sec:robust}).
+  \item Single-GPU serving measurements for four workload profiles, a shared-prefix path that
+    branches both the attention KV cache and the Gated DeltaNet convolution and recurrent
+    state, and a vLLM engine study of the served artifact (Sections~\ref{sec:serving}
+    and~\ref{sec:engine}).
+\end{itemize}
+
+\paragraph{Scope.}
+The six-task evaluation is Korean only; English appears in a small author-written probe set
+and in the 329 questions of the Jev comparison. None of the evaluation data has been reviewed by a person. The project's designated
+quality reference, the direct-logit readout of GLM-5.3-Flash \citep{glm53flash}, has not
+been run on the same evaluation, so the release gates defined against it are not judged
+here. The model is larger than the 1 to 8B
+parameter target of our own specification. Section~\ref{sec:limits} lists these and other
+limitations together with the negative results.
+
+\subsection{Related work}
+\label{sec:related}
+
+\paragraph{Reading decisions from logits.}
+Scoring a fixed set of answer tokens at one position instead of sampling text is a
+standard way to evaluate multiple-choice benchmarks such as MMLU \citep{hendrycks2021mmlu}
+and HellaSwag \citep{zellers2019hellaswag}. Bobcat applies the same readout to caller-defined
+candidates at serving time and treats the restriction to offered identifiers as a security
+boundary rather than an evaluation convenience.
+
+\paragraph{Calibration and proper scoring rules.}
+The Brier score \citep{brier1950} and the log score are proper scoring rules. Post-hoc
+temperature scaling \citep{guo2017calibration} fits one scalar on held-out data and leaves
+the argmax unchanged. We use it as the only calibration step and compare a sampled
+REINFORCE estimator \citep{williams1992} whose expected gradient equals that of the half
+Brier score against direct Brier and cross-entropy training.
+
+\paragraph{Efficient adaptation and serving.}
+LoRA \citep{hu2021lora} trains low-rank updates of frozen weights. Gated DeltaNet
+\citep{yang2024gdn} is a linear-attention layer with a gated delta-rule recurrence;
+hybrids that interleave such layers with full attention carry a recurrent and a short
+convolution state in addition to a KV cache, which matters when a shared prefix is reused
+across branches. Prefix caching in serving engines such as vLLM \citep{kwon2023vllm}
+reuses the KV blocks of a shared prompt; Section~\ref{sec:engine} measures such an engine on
+our workloads.
+
+\paragraph{Korean evaluation.}
+Our product evaluation is built from KLUE machine reading comprehension and Wizard of Seoul
+dialogues \citep{park2021klue}. Section~\ref{sec:kbench} reports public Korean
+benchmarks: KoBEST \citep{kim2022kobest}, KMMLU \citep{son2024kmmlu}, HAE-RAE Bench
+\citep{son2023haerae} and CLIcK \citep{kim2024click}.

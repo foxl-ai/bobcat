@@ -1,0 +1,8 @@
+# repo revision max_branch_tokens — zero-shot comparison on product eval v2 dev, one L40S 48 GB.
+# All Apache-2.0/MIT and ungated. Qwen3.5 is hybrid (3 linear : 1 full attention). BF16 only:
+# official FP8 checkpoints need Hub-downloaded kernels that we do not trust-run (see report).
+Qwen/Qwen3.5-9B c202236235762e1c871ad0ccb60c8ee5ba337b9a 32768
+skt/A.X-4.0-Light ba21c20ea1b31ded1ec3e2fb432335077dc4be98 16384
+trillionlabs/Tri-7B 94e2cc881102428ab9be3df2366a09ac928c2c82 32768
+google/gemma-4-12B-it 707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7 32768
+microsoft/Phi-4-mini-instruct cfbefacb99257ffa30c83adab238a50856ac3083 32768

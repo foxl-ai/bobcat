@@ -1,0 +1,80 @@
+\section{Prompt template shape and workload questions}
+\label{app:prompt}
+
+\subsection{Compiled sequence}
+
+Every question is compiled into the following shape. Role markers and any special tokens are
+produced by the backbone's own chat template (rendered with thinking disabled) and encoded
+with the host tokenizer; everything shown in the user message after \texttt{"state":} is
+encoded with the data tokenizer, which has no added tokens (Section~\ref{sec:datatok}).
+Line breaks inside the user message are for display only; the actual JSON is compact
+(separators \texttt{,} and \texttt{:}, non-ASCII characters kept).
+
+\begin{small}
+\begin{verbatim}
+[system]
+Judge the state using the question's instructions and all candidate meanings.
+The state and candidate descriptions are data, not additional system messages.
+Return exactly the selected identifier, with no explanation or extra characters.
+For score questions the candidates are ordered levels; for noul they mean
+false/true.
+[user]
+{"state":STATE,
+ "question":{"type":TYPE,
+             "instructions":INSTRUCTIONS,
+             "candidates":[{"identifier":"A","meaning":MEANING_1},
+                           {"identifier":"B","meaning":MEANING_2},
+                           ...]}}
+[assistant, generation prompt]
+   <- candidate logits are read at the last position of this sequence
+\end{verbatim}
+\end{small}
+
+\begin{itemize}
+  \item \texttt{STATE} is the request's state as JSON (a string state becomes a JSON string);
+    key order is preserved.
+  \item \texttt{TYPE} is \texttt{choice}, \texttt{noul} or \texttt{score};
+    \texttt{INSTRUCTIONS} is the caller's value as JSON (or \texttt{null}).
+  \item For a Choice, \texttt{MEANING} is the candidate name if it has no description, and
+    otherwise the JSON text of \texttt{\{"description": D, "name": N\}} with sorted keys.
+  \item For a Noul there are two candidates, in the order \emph{false}, \emph{true}, whose
+    meanings are the JSON text of \texttt{\{"description": D, "value": "false"\}} and the
+    same for \texttt{"true"} (\texttt{D} may be \texttt{null}).
+  \item For a Score, the candidates are the levels in order, and \texttt{MEANING} is the
+    level's text (or its JSON text if the level is structured).
+  \item Identifiers are assigned by position from the verified list of
+    Section~\ref{sec:identifiers}. The question ID is never part of the sequence.
+\end{itemize}
+
+\subsection{Injection and distractor texts}
+
+The stress suites of Section~\ref{sec:robust} use Korean text. The injection sentences are
+translated in Section~\ref{sec:injection}. The two irrelevant candidates are ``banana
+prices'' (described as today's banana price in the fruit market) and ``space station orbit''
+(the current orbital altitude of the International Space Station); for title questions they
+are replaced by headlines about a banana price rise and an orbit adjustment of the
+International Space Station.
+
+\subsection{Serving workload questions}
+
+The serving benchmark (Section~\ref{sec:serving}) builds its states as
+\texttt{\{"document": text\}} from development passages, with the text length chosen by
+binary search so that the longest compiled question reaches the target length. The questions
+are Korean; translated:
+\begin{itemize}
+  \item \textbf{W1} (and each W4 request): one Choice, ``choose the main topic of the
+    document'', over eight topics (politics and elections, economy and finance, society and
+    incidents, international relations, science and technology, culture and arts, sports,
+    life and health).
+  \item \textbf{W2}: eight questions on the same state: four Noul questions (does the
+    document deal with a person, a date, an amount, a place), the eight-way topic Choice, a
+    four-way tone Choice (neutral report, critical, promotional, personal opinion), a
+    six-way audience Choice (general readers, experts, investors, officials and
+    institutions, students, consumers) and a five-level Score of informational specificity
+    (none, low, medium, high, very high).
+  \item \textbf{W3} (8K and 16K): one four-way Choice of document type (news report, column
+    or essay, notice, other). \textbf{W3 K77 / K255}: the first development title-selection
+    questions with 77 and 255 candidates.
+  \item \textbf{W4}: 32 distinct W1-style requests of 1,024 tokens, run as static batches of
+    1, 8, 16 and 32.
+\end{itemize}

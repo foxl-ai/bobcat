@@ -1,0 +1,45 @@
+{
+  "schema": "bobcat-product-eval-sources-v1",
+  "repo": "klue/klue",
+  "revision": "349481ec73fff722f88e0453ca05c77a447d967c",
+  "language": "ko",
+  "license": "CC-BY-SA-4.0",
+  "attribution": "Sungjoon Park et al., KLUE: Korean Language Understanding Evaluation, 2021, arXiv:2105.09680.",
+  "license_path": "licenses/KLUE-CC-BY-SA-4.0.txt",
+  "annotation_origin": "Upstream human annotations (MRC questions, answers and unanswerable flags; WoS dialogue states). No teacher or Jev outputs.",
+  "scope": "Evaluation-only sources. KLUE MRC and WoS appear in no Bobcat training, calibration or development corpus as of 2026-09-24.",
+  "files": [
+    {
+      "task": "mrc",
+      "split": "validation",
+      "path": "mrc/validation-00000-of-00001.parquet",
+      "bytes": 8683138,
+      "rows": 5841,
+      "sha256": "f576c924f471702a6fa3369d314bea2e47545c56736f371a2adb90ed15913738"
+    },
+    {
+      "task": "mrc",
+      "split": "train",
+      "path": "mrc/train-00000-of-00001.parquet",
+      "bytes": 21415334,
+      "rows": 17554,
+      "sha256": "45fcfd50b99aed4cd55c8c5856e42aa4a5139808cc36b36994b3c1991aca93dd"
+    },
+    {
+      "task": "wos",
+      "split": "validation",
+      "path": "wos/validation-00000-of-00001.parquet",
+      "bytes": 715108,
+      "rows": 1000,
+      "sha256": "f5342b51a1565aa9719adcb02125c8719c6ba8d3dda5be5c948e642db451fbdf"
+    },
+    {
+      "task": "wos",
+      "split": "train",
+      "path": "wos/train-00000-of-00001.parquet",
+      "bytes": 5643747,
+      "rows": 8000,
+      "sha256": "36003fc8ef605306180591e708ace9043b30ec8fbc0c657ed1f01d53cd4a8a01"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "schema": "bobcat-glm-diagnostic-plan-v1",
+  "suites": {
+    "identifier": {
+      "path": "artifacts/glm-identifier-controls-v1.json",
+      "sha256": "f12135942ba98bf83468f268ef365bdd90ccdfb7a86ef9df7dffd8342f4a2bb0"
+    },
+    "workflow": {
+      "path": "artifacts/workflow-probes-v1.json",
+      "sha256": "a58e8d5c5e0c328ad914e1395ca3e42ac0feca5827aff104a13e47d354eb6019"
+    },
+    "cache": {
+      "path": "artifacts/glm-cache-cases-v1.json",
+      "sha256": "88de385ae995801b22e4da39f281d60fbcc509ee27972d47dd586d54603f3591"
+    }
+  },
+  "allowances_seconds": {
+    "identifier": 600,
+    "workflow": 300,
+    "cache": 1500,
+    "profile": 900
+  },
+  "cache_repeats": 2,
+  "profile_case_id": "ko-q8-notes128",
+  "profile_blocks": 2,
+  "expected_tp_ranks": 8,
+  "content_sha256": "8676d0f79071273149fce7397b00e9b2a59a60dab73efafebc27875cb8ef7e82"
+}

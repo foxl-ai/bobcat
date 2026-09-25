@@ -1,0 +1,4 @@
+# repo revision max_branch_tokens — BF16 Qwen candidates that need one >=80 GB GPU.
+# Artificial Analysis non-reasoning index: Qwen3.8 27B 20, Qwen3.6 35B-A3B 15 (3B active).
+Qwen/Qwen3.8-27B 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 32768
+Qwen/Qwen3.6-35B-A3B 995ad96eacd98c81ed38be0c5b274b04031597b0 32768

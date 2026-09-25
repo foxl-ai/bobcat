@@ -1,0 +1,68 @@
+\section{Compute and provenance}
+\label{app:compute}
+
+\subsection{Compute}
+
+Table~\ref{tab:compute} lists the hardware and approximate duration behind each result. Hours
+are wall-clock hours of the host, including setup and failed attempts where stated.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Compute behind the runs reported in this paper.}
+\label{tab:compute}
+\begin{tabular}{@{}p{4.6cm}p{8.6cm}@{}}
+\toprule
+Run & Hardware and duration \\
+\midrule
+Backbone zero-shot, seven models & one L40S for 1.68\,h; four L40S for about 4.0\,h,
+  including about 3.2\,h idle after the job ended \\
+DeepSeek-V4.1-Flash zero-shot & eight B300, attempts of about 0.2\,h and 1.58\,h \\
+Student training (baseline, five arms, evaluation) & eight B300, about 4.5\,h \\
+Sealed final, stress, serving, pointer retest & eight B300: a first host for about 0.51\,h and
+  a second for about 1.25\,h \\
+Korean external benchmarks (Section~\ref{sec:kbench}) & eight H100, about 1.22\,h, including a
+  restart after an automatic operating-system reboot \\
+vLLM engine study (Section~\ref{sec:engine}) & eight H100 (one used per configuration), two
+  hosts: about 0.6\,h without results (reboot and setup failures) and about 1.0\,h of
+  measurement \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+An automatic patching policy rebooted both vLLM measurement hosts a few minutes after boot; it
+was left on, and work started after the first reboot.
+
+\subsection{Provenance of the evaluated artifact}
+
+The release manifest was frozen at 2026-09-25 02:40:42 UTC (commit \texttt{12942f9} of the
+development history) before the final split was opened. The training code was at commit
+\texttt{629a40c}. At freeze time the repository's test suite reported 752 passed and 4
+skipped (the skipped tests need transformers, which the CPU node lacks, and ran on the GPU
+host's preflight); passing tests is a structural check, not a quality result.
+
+\begin{table}[h]
+\centering
+\scriptsize
+\caption{Hashes recorded in the release and candidate manifests (SHA256 unless noted).}
+\label{tab:hashes}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Item & Hash \\
+\midrule
+Base revision (git commit) & \texttt{1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0} \\
+\texttt{tokenizer.json} & \texttt{0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3} \\
+\texttt{tokenizer\_config.json} & \texttt{b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27} \\
+\texttt{chat\_template.jinja} & \texttt{c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041} \\
+\texttt{config.json} & \texttt{191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab} \\
+Identifier list & \texttt{d6e43502761f22738fe08da541d201347d80672754199b7f9b9937c404ba55d0} \\
+Rendered template & \texttt{6c66698b2c93d4c21922a0bb88589380c726313bdea6529a5822c01c3785e313} \\
+Adapter weights & \texttt{2704495d178760769e69ff08327e17c3c529bb108a5be7a1896b15d870f4a0c7} \\
+Candidate manifest & \texttt{e6a6683afa512565267a9dee68f22f1c5ab1b1ae9b5839b45b75808856d0f770} \\
+Training mixture & \texttt{d75955315c098253712dec65b477629916ffe9e93958c5c3ce0d80c0bd37be38} \\
+Development split & \texttt{0cb4079e399550114dc4dfe11462028d2bc400b653bb090832647261f4fc013e} \\
+Final split & \texttt{d7c2b46e307bcf9e38214fc71a891fdf29075cdca5d550a10ac0a1ad29cee534} \\
+Evaluation content & \texttt{847f4231e9fae8942123c98d1b8fd1b36fcc2750c79cf15e23ecea1e68212142} \\
+\bottomrule
+\end{tabular}
+\end{table}

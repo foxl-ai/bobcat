@@ -1,0 +1,142 @@
+\section{Engine study}
+\label{sec:engine}
+
+Section~\ref{sec:serving} measured a research serving path without a production engine. Here
+we measure \expone{} under vLLM 0.30.0 \citep{kwon2023vllm} on one NVIDIA H100 80GB GPU, the
+GPU we chose for serving (our internal deployment runs the same artifact on one L40S 48GB,
+because no H100 was available; Section~\ref{sec:availability}). All numbers in this section
+were measured on 2026-09-25.
+
+\subsection{Setup}
+\label{sec:engine_setup}
+
+\paragraph{Hardware and engine.}
+One H100 80GB HBM3 GPU of an eight-GPU node, vLLM 0.30.0 with
+Torch 2.13 and CUDA 13. The engine receives the token IDs produced by the Bobcat compiler
+unchanged.
+
+\paragraph{Readout.}
+We read only the raw logits of the offered identifier tokens (vLLM's raw-logit log-probability
+mode with an explicit token list). Every request asks for a fixed width of 64 identifiers; a
+question with more candidates is asked several times with the same prompt, and the extra
+requests reuse the cached prompt. \textbf{vLLM computes one token per request at temperature
+0 and discards it}; that token never enters a reply. This differs from the research path of
+Section~\ref{sec:serving}, which samples nothing, so ``no generation'' on this engine means
+that no generated token reaches the caller, not that the engine performs no decode step.
+
+\paragraph{Served artifact.}
+The LoRA adapter is merged into the base weights with the sum computed in float32 and stored
+in BF16. For FP8, vLLM quantizes the merged BF16 weights dynamically at load time. The merged
+FP8 model is the artifact our internal deployment serves.
+
+\paragraph{Workloads.}
+The workload profiles W1 to W4 of our specification. W1 to W3 are measured warm with 20 repetitions (10 for the 8K and
+16K inputs), each repetition on a different document; W4 submits between 1 and 512 distinct,
+independent 1,024-token requests. Timings are taken at the engine call and exclude HTTP and the
+network.
+
+\paragraph{Engine constraints we hit.}
+\begin{itemize}
+  \item vLLM's default of 1,024 concurrent sequences exceeds the number of cache blocks it can
+    allocate on an 80\,GB H100 for the hybrid layers' recurrent state (which vLLM calls the
+    Mamba cache): 292 in BF16 and 763 in FP8. We capped concurrency at 256.
+  \item When the number of requested log-probabilities varied between requests, Triton
+    compiled a kernel for each new shape and the engine stalled for minutes (observed with
+    \texttt{py-spy}). A fixed width of 64 removes this.
+  \item The full-vocabulary log-probability path that we first used for questions with more
+    than 128 candidates ran out of memory. Chunks of 64 identifiers replace it.
+\end{itemize}
+
+\subsection{Quality of the served artifact}
+\label{sec:engine_quality}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Development accuracy (\%) of the served artifacts against the evaluated model
+(3,188 decisions). Agreement is the fraction of development answers equal to the evaluation
+path of the sealed final; gaps are the largest and mean absolute probability differences.}
+\label{tab:engine_quality}
+\setlength{\tabcolsep}{3.5pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}lrrrrrrrrr@{}}
+\toprule
+Artifact & Macro & Search & Citation & Tool & Doc.\ screen & Routing & Class. & Agreement & Max / mean gap \\
+\midrule
+Evaluated: unmerged LoRA, transformers & 93.4 & 92.2 & 99.8 & 95.0 & 96.5 & 99.3 & 77.6 & -- & -- \\
+Merged BF16, vLLM & 93.3 & 92.9 & 100.0 & 95.0 & 96.0 & 98.9 & 76.8 & 98.6\% & 0.90 / 0.013 \\
+\textbf{Merged FP8, vLLM (served)} & \textbf{93.1} & 92.6 & 99.8 & 94.5 & 96.0 & 99.1 & 76.4 & \textbf{98.3\%} & 0.80 / 0.015 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+The served FP8 artifact scores 93.1\% on development against 93.4\% for the evaluated model,
+and 1.7\% of its answers differ (1.4\% for merged BF16; Table~\ref{tab:engine_quality}). The
+largest single probability differences are large (0.80 and 0.90) even though the mean
+differences are near 0.01. The sealed final result of 94.6\% was measured on the unmerged
+path and does not transfer to the served artifact; a separately released served model would
+need a new sealed split, because the current final has been opened. The float32 merge did not
+remove the merge difference seen in Section~\ref{sec:determinism}; because the merge
+procedure and the engine both changed, the two measurements are not a controlled comparison
+and we do not attribute the remaining difference.
+
+\subsection{Latency and throughput}
+\label{sec:engine_latency}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Latency (p50 in ms unless marked) and throughput on one H100 with vLLM 0.30.0.
+Qwen3.5-9B is untrained and measured for speed only. Engine-call timings, no HTTP or network.
+W4 reports the best throughput over batch sizes 1 to 512.}
+\label{tab:engine}
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Workload & 27B FP8 (served) & 27B BF16 & 9B FP8 (speed only) & 9B BF16 (speed only) \\
+\midrule
+W1: 512 tokens, 8 candidates, 1 question, p50 / p95 & \textbf{50 / 50} & 55 / 59 & 29 / 29 & 30 / 30 \\
+W2: 3.2k-token state, 8 questions, one batch & 550 & 709 & 137 & 167 \\
+W2: parent question first, 7 reuse the prefix cache & 617 & 736 & 179 & 201 \\
+W3: 8,192 tokens, 1 question & 417 & 698 & 120 & 148 \\
+W3: 16,320 tokens, 1 question & 606 & 766 & 176 & 230 \\
+W4: best throughput, input tokens/s & \textbf{16,282} & 12,524 & 54,812 & 41,794 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{The engine lowers short-request latency.}
+W1 takes 50\,ms at the median in FP8 and 55\,ms in BF16 (Table~\ref{tab:engine}), against
+97\,ms for the transformers path on one B300 (Section~\ref{sec:serving}). Throughput is
+similar: 16,282 input tokens per second for vLLM FP8 on the H100 against 16,072 for
+transformers on the B300. The GPUs differ, so this is not a controlled engine comparison.
+One tail value stands out: BF16 at 16K tokens has a p95 of 1,410\,ms against a p50 of 766\,ms.
+
+\paragraph{The engine's prefix cache did not help W2.}
+vLLM caches the hybrid layers' recurrent state in its \texttt{align} mode. Running the parent
+question first and letting the other seven reuse its cached prefix was slower than submitting
+all eight as one batch (617 against 550\,ms in FP8). Our own state branching on the
+transformers path (Section~\ref{sec:branching}) reduced W2 from 1,633 to 379\,ms on the B300;
+it has not been ported to vLLM.
+
+\paragraph{A 9B backbone is much faster.}
+Qwen3.5-9B, measured for speed only and not trained for Bobcat, reaches 54,812 input tokens
+per second in FP8 and answers W1 in 29\,ms. Its decision quality after training is unknown;
+zero-shot it scored 78.4\% on development (Section~\ref{sec:leaderboard}).
+
+\paragraph{Remaining engine headroom.}
+Porting our hybrid state branching to vLLM would, by our estimate, make shared-context
+workloads three to four times faster; CUDA graphs, an FP8 KV cache and larger-batch
+scheduling also remain untried. None of these is measured here.
+
+\subsection{What was not measured}
+
+HTTP handling, the network and the authenticating edge are excluded from these timings. On the
+internal deployment's L40S, a W1-shaped request (588 input tokens, eight candidates) took
+154\,ms at the median over local HTTP, and a three-question request from one client through
+the edge over the internet took 294\,ms at the median over ten requests; latency under load
+has not been measured. W4 measures engine throughput, not latency under a queue of
+concurrent users. The 9B numbers are speed only.

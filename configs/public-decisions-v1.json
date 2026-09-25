@@ -1,0 +1,219 @@
+{
+  "schema": "bobcat-public-decision-sources-v1",
+  "sources": {
+    "klue_sts": {
+      "repo": "klue/klue",
+      "revision": "349481ec73fff722f88e0453ca05c77a447d967c",
+      "upstream_repo": "KLUE-benchmark/KLUE",
+      "upstream_revision": "3efd98708a40ff49251fddde35453f8fbb11f536",
+      "license": "CC-BY-SA-4.0",
+      "attribution": "Park et al. (2021), KLUE: Korean Language Understanding Evaluation.",
+      "license_evidence": "KLUE project License.md and pinned dataset card",
+      "score_annotation": "labels.real-label; observed annotator mean, no vote histogram"
+    },
+    "banking77": {
+      "repo": "PolyAI-LDN/task-specific-datasets",
+      "revision": "57ec275d8078af65b7731c2a98be812d844a6d6b",
+      "license": "CC-BY-4.0",
+      "attribution": "Casanueva et al. (2020), Efficient Intent Detection with Dual Sentence Encoders. PolyAI Ltd.",
+      "license_evidence": "pinned publisher LICENSE",
+      "candidate_count": 77
+    },
+    "boolq": {
+      "repo": "google/boolq",
+      "revision": "35b264d03638db9f4ce671b711558bf7ff0f80d5",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Clark et al. (2019), BoolQ: Exploring the Surprising Difficulty of Natural Yes/No Questions.",
+      "license_evidence": "pinned publisher dataset card"
+    },
+    "arc": {
+      "repo": "allenai/ai2_arc",
+      "revision": "210d026faf9955653af8916fad021475a3f00453",
+      "license": "CC-BY-SA-4.0",
+      "attribution": "Clark et al. (2018), Think you have Solved Question Answering? Try ARC, the AI2 Reasoning Challenge.",
+      "license_evidence": "pinned allenai dataset card YAML; its body licensing section is unspecified"
+    }
+  },
+  "files": [
+    {
+      "url": "https://huggingface.co/datasets/klue/klue/resolve/349481ec73fff722f88e0453ca05c77a447d967c/sts/train-00000-of-00001.parquet",
+      "bytes": 1519075,
+      "sha256": "fa624db134d4242f24e232432055f09f34652c3852eb77ff98ca4784edfed184",
+      "path": "klue-sts-train.parquet",
+      "source": "klue_sts",
+      "task": "klue_sts",
+      "split": "train",
+      "format": "parquet",
+      "rows": 11668
+    },
+    {
+      "url": "https://huggingface.co/datasets/klue/klue/resolve/349481ec73fff722f88e0453ca05c77a447d967c/sts/validation-00000-of-00001.parquet",
+      "bytes": 68780,
+      "sha256": "67611cf65f0d35feb244af81a1609186c55cc3a4aee293d1ceb02fb0d6b721ea",
+      "path": "klue-sts-validation.parquet",
+      "source": "klue_sts",
+      "task": "klue_sts",
+      "split": "validation",
+      "format": "parquet",
+      "rows": 519
+    },
+    {
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/57ec275d8078af65b7731c2a98be812d844a6d6b/banking_data/train.csv",
+      "bytes": 839073,
+      "sha256": "b06e26ac675513959a63135f11b94ea7786ed02da65db93a5650d8838cbc664b",
+      "path": "banking-train.csv",
+      "source": "banking77",
+      "task": "banking77",
+      "split": "train",
+      "format": "csv",
+      "rows": 10003
+    },
+    {
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/57ec275d8078af65b7731c2a98be812d844a6d6b/banking_data/test.csv",
+      "bytes": 239961,
+      "sha256": "d12d6e3bc4c3103966ae786dc435913c0c563dfa328f5a3646d0e62cfeeb474d",
+      "path": "banking-test.csv",
+      "source": "banking77",
+      "task": "banking77",
+      "split": "test",
+      "format": "csv",
+      "rows": 3080
+    },
+    {
+      "url": "https://huggingface.co/datasets/google/boolq/resolve/35b264d03638db9f4ce671b711558bf7ff0f80d5/data/train-00000-of-00001.parquet",
+      "bytes": 3685146,
+      "sha256": "4f028e992c0bd4df30b9f056f4946b64f5c23028034ff0ed5ea467d8538cc623",
+      "path": "boolq-train.parquet",
+      "source": "boolq",
+      "task": "boolq",
+      "split": "train",
+      "format": "parquet",
+      "rows": 9427
+    },
+    {
+      "url": "https://huggingface.co/datasets/google/boolq/resolve/35b264d03638db9f4ce671b711558bf7ff0f80d5/data/validation-00000-of-00001.parquet",
+      "bytes": 1257630,
+      "sha256": "52355d11524b4b874a9b9dcc278feb10f672d52c4f4eff9872e695ede59820f8",
+      "path": "boolq-validation.parquet",
+      "source": "boolq",
+      "task": "boolq",
+      "split": "validation",
+      "format": "parquet",
+      "rows": 3270
+    },
+    {
+      "url": "https://huggingface.co/datasets/allenai/ai2_arc/resolve/210d026faf9955653af8916fad021475a3f00453/ARC-Challenge/train-00000-of-00001.parquet",
+      "bytes": 189909,
+      "sha256": "e488c1587ffdcfc8443f916c53488a95cd471c5790e0746c6bfe4cecf20962cb",
+      "path": "arc-challenge-train.parquet",
+      "source": "arc",
+      "task": "arc_challenge",
+      "split": "train",
+      "format": "parquet",
+      "rows": 1119
+    },
+    {
+      "url": "https://huggingface.co/datasets/allenai/ai2_arc/resolve/210d026faf9955653af8916fad021475a3f00453/ARC-Challenge/validation-00000-of-00001.parquet",
+      "bytes": 55743,
+      "sha256": "395a5c88d1580d69855fbaee9450270578df1ad5af6259771cd0a42c20e99f05",
+      "path": "arc-challenge-validation.parquet",
+      "source": "arc",
+      "task": "arc_challenge",
+      "split": "validation",
+      "format": "parquet",
+      "rows": 299
+    },
+    {
+      "url": "https://huggingface.co/datasets/allenai/ai2_arc/resolve/210d026faf9955653af8916fad021475a3f00453/ARC-Challenge/test-00000-of-00001.parquet",
+      "bytes": 203808,
+      "sha256": "62f03257e737aed263f55c6abf87c7bb0028a44a6bdd2a26eb1279eb42c1d1e9",
+      "path": "arc-challenge-test.parquet",
+      "source": "arc",
+      "task": "arc_challenge",
+      "split": "test",
+      "format": "parquet",
+      "rows": 1172
+    },
+    {
+      "url": "https://huggingface.co/datasets/allenai/ai2_arc/resolve/210d026faf9955653af8916fad021475a3f00453/ARC-Easy/train-00000-of-00001.parquet",
+      "bytes": 330598,
+      "sha256": "b315db8a4be597dc7daa50a4e70d48dd7c990c32085629e6ccd8c926beaa80b5",
+      "path": "arc-easy-train.parquet",
+      "source": "arc",
+      "task": "arc_easy",
+      "split": "train",
+      "format": "parquet",
+      "rows": 2251
+    },
+    {
+      "url": "https://huggingface.co/datasets/allenai/ai2_arc/resolve/210d026faf9955653af8916fad021475a3f00453/ARC-Easy/validation-00000-of-00001.parquet",
+      "bytes": 86080,
+      "sha256": "ed890ff1e4cef7a7140d3a30dcea3ed2c9d467c6458f447ad9ef0176d8dcbb74",
+      "path": "arc-easy-validation.parquet",
+      "source": "arc",
+      "task": "arc_easy",
+      "split": "validation",
+      "format": "parquet",
+      "rows": 570
+    },
+    {
+      "url": "https://huggingface.co/datasets/allenai/ai2_arc/resolve/210d026faf9955653af8916fad021475a3f00453/ARC-Easy/test-00000-of-00001.parquet",
+      "bytes": 346257,
+      "sha256": "4160597d618ae851c7eb04e281574f3f654776216ac6b6641588d64527b47177",
+      "path": "arc-easy-test.parquet",
+      "source": "arc",
+      "task": "arc_easy",
+      "split": "test",
+      "format": "parquet",
+      "rows": 2376
+    }
+  ],
+  "support": [
+    {
+      "url": "https://huggingface.co/datasets/klue/klue/raw/349481ec73fff722f88e0453ca05c77a447d967c/README.md",
+      "bytes": 22458,
+      "sha256": "77857d77d4e711c0eb655355667dc5e150edee8668b2048a0f104f7e6ce7db96",
+      "path": "klue-readme.md"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/57ec275d8078af65b7731c2a98be812d844a6d6b/README.md",
+      "bytes": 4735,
+      "sha256": "7b9ce9069931cc2de89dce8c7ffb53d07806cf413601ccf133b9af5227b3a373",
+      "path": "banking-upstream-readme.md"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/57ec275d8078af65b7731c2a98be812d844a6d6b/banking_data/categories.json",
+      "bytes": 2036,
+      "sha256": "53261da888122daf2d120d925458631d9619e15d82e56052e7a42e535ce32b63",
+      "path": "banking-categories.json"
+    },
+    {
+      "url": "https://huggingface.co/datasets/google/boolq/raw/35b264d03638db9f4ce671b711558bf7ff0f80d5/README.md",
+      "bytes": 6570,
+      "sha256": "07447668f46c7c1e62e24b650ea2a73f1ab34f2b3759b1587c7b7a81b4bf1cf4",
+      "path": "boolq-readme.md"
+    },
+    {
+      "url": "https://huggingface.co/datasets/allenai/ai2_arc/raw/210d026faf9955653af8916fad021475a3f00453/README.md",
+      "bytes": 9001,
+      "sha256": "4a293e352253d771604725c978adcea71ee6504e89ed40e1cb0024ecafa9b37e",
+      "path": "arc-readme.md"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/57ec275d8078af65b7731c2a98be812d844a6d6b/LICENSE",
+      "bytes": 18650,
+      "sha256": "7e7170e3cebf88a9f60c7b8421418323c09304da1af4d5e90f4da1dc1c8a2661",
+      "path": "banking-license.txt"
+    },
+    {
+      "url": "https://creativecommons.org/licenses/by-sa/3.0/legalcode.txt",
+      "bytes": 22240,
+      "sha256": "3f941b3b89cf7b8370ceb83cc76d2120d471b58735d8ca60238a751a48d7f72f",
+      "path": "boolq-license.txt"
+    }
+  ],
+  "banking_categories_file": "banking-categories.json",
+  "public_validation_and_test_use": "development diagnostics only; excluded from optimization",
+  "downstream_license": "preserve per-source attribution and terms; no blanket relicensing of data",
+  "teacher_labels_used": false
+}

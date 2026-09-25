@@ -1,0 +1,64 @@
+{
+  "schema": "bobcat-kobest-evaluation-sources-v1",
+  "repo": "skt/kobest_v1",
+  "revision": "a5ea15e3ac77ed694b79f6204eb31889a2ba989f",
+  "language": "ko",
+  "license": "CC-BY-SA-4.0",
+  "attribution": "Kim et al. (2022), KoBEST: Korean Balanced Evaluation of Significant Tasks; SKT-LSL.",
+  "license_evidence": "Publisher dataset card YAML at the pinned revision; README.md full SHA256 below.",
+  "readme_sha256": "1c4262c2447ad5c23fae75dd8b375c8836b331c98ab552130ce5d79d3de3798e",
+  "readme_url": "https://huggingface.co/datasets/skt/kobest_v1/raw/a5ea15e3ac77ed694b79f6204eb31889a2ba989f/README.md",
+  "training_use": false,
+  "calibration_use": false,
+  "evaluation_role": "External Korean development diagnostics. Neither a fresh final nor the full official score.",
+  "pretraining_contamination_status": "Not measured; public pretrained base and web corpus exposure remain unknown.",
+  "files": [
+    {
+      "path": "boolq/test.jsonl",
+      "url": "https://huggingface.co/datasets/skt/kobest_v1/resolve/a5ea15e3ac77ed694b79f6204eb31889a2ba989f/boolq/test.jsonl",
+      "bytes": 1406101,
+      "sha256": "e6fb1bceab2e3e132119e7ce23d98c38e7700ce38bd0d00ec4f26c9a07d6b583",
+      "rows": 1404,
+      "task": "boolq"
+    },
+    {
+      "path": "copa/test.jsonl",
+      "url": "https://huggingface.co/datasets/skt/kobest_v1/resolve/a5ea15e3ac77ed694b79f6204eb31889a2ba989f/copa/test.jsonl",
+      "bytes": 291453,
+      "sha256": "2912f4055e3fb170b94d0c25fef09a2015b5c61d99a1b6355d276d1099bd9f79",
+      "rows": 1000,
+      "task": "copa"
+    },
+    {
+      "path": "wic/test.jsonl",
+      "url": "https://huggingface.co/datasets/skt/kobest_v1/resolve/a5ea15e3ac77ed694b79f6204eb31889a2ba989f/wic/test.jsonl",
+      "bytes": 390094,
+      "sha256": "4cfe0308d434cf9935d29768de0a5ce6ff811b4095fecc26a95c01b5cb5ca0ec",
+      "rows": 1260,
+      "task": "wic"
+    },
+    {
+      "path": "hellaswag/test.jsonl",
+      "url": "https://huggingface.co/datasets/skt/kobest_v1/resolve/a5ea15e3ac77ed694b79f6204eb31889a2ba989f/hellaswag/test.jsonl",
+      "bytes": 577726,
+      "sha256": "4e4a21822a18c8fa181a158ba1aaca8a28d6085b2b91861577d633a099997346",
+      "rows": 500,
+      "task": "hellaswag"
+    },
+    {
+      "path": "sentineg/test.jsonl",
+      "url": "https://huggingface.co/datasets/skt/kobest_v1/resolve/a5ea15e3ac77ed694b79f6204eb31889a2ba989f/sentineg/test.jsonl",
+      "bytes": 40681,
+      "sha256": "0fe36f1348039878945a276ce84f87949b9d8ca6f21b375b94e156fbab1753fc",
+      "rows": 397,
+      "task": "sentineg"
+    }
+  ],
+  "excluded_support": [
+    {
+      "path": "sentineg/test_originated.jsonl",
+      "reason": "Publisher describes corresponding source training reviews. Not included in evaluation or Bobcat training."
+    }
+  ],
+  "upstream_card_errors_observed": "HellaSwag field/split description conflicts with pinned JSONL; adapter requires four original ending fields and zero-based labels 0..3."
+}

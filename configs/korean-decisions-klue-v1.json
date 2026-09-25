@@ -1,0 +1,52 @@
+{
+  "schema": "bobcat-klue-sources-v1",
+  "repo": "klue/klue",
+  "revision": "349481ec73fff722f88e0453ca05c77a447d967c",
+  "language": "ko",
+  "license": "CC-BY-SA-4.0",
+  "attribution": "Sungjoon Park et al., KLUE: Korean Language Understanding Evaluation, 2021, arXiv:2105.09680.",
+  "project_revision": "3efd98708a40ff49251fddde35453f8fbb11f536",
+  "license_path": "licenses/KLUE-CC-BY-SA-4.0.txt",
+  "license_sha256": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297",
+  "card_sha256": "77857d77d4e711c0eb655355667dc5e150edee8668b2048a0f104f7e6ce7db96",
+  "annotation_origin": "Upstream human annotations; no teacher or Jev outputs.",
+  "scope": "Native Korean task training and public development diagnostics, not fresh final evaluation.",
+  "label_names": {
+    "nli": ["entailment", "neutral", "contradiction"],
+    "ynat": ["IT과학", "경제", "사회", "생활문화", "세계", "스포츠", "정치"]
+  },
+  "files": [
+    {
+      "task": "nli",
+      "split": "train",
+      "path": "nli/train-00000-of-00001.parquet",
+      "bytes": 1832150,
+      "rows": 24998,
+      "sha256": "35a8eb31818b94d9cfcb3477914360ce038b46b3bce4075eaef92309caa2c07c"
+    },
+    {
+      "task": "nli",
+      "split": "validation",
+      "path": "nli/validation-00000-of-00001.parquet",
+      "bytes": 223966,
+      "rows": 3000,
+      "sha256": "b809f8f0aac2a2f41cd095bf15d8dbca9c931d7539390b6ef6241ca976195423"
+    },
+    {
+      "task": "ynat",
+      "split": "train",
+      "path": "ynat/train-00000-of-00001.parquet",
+      "bytes": 4165783,
+      "rows": 45678,
+      "sha256": "062c3b51c1ca34ed23c8fd19ffa5ea0ddcd914a95aeb9077d89576d3ef71d123"
+    },
+    {
+      "task": "ynat",
+      "split": "validation",
+      "path": "ynat/validation-00000-of-00001.parquet",
+      "bytes": 846520,
+      "rows": 9107,
+      "sha256": "521a6785a2492a9142474ad23ae038b1a6f333fa7e39aab8fd9dd19a20c9ce92"
+    }
+  ]
+}

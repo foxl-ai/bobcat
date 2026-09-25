@@ -1,0 +1,214 @@
+\section{Korean external benchmarks}
+\label{sec:kbench}
+
+The product evaluation of Section~\ref{sec:data} measures the six tasks Bobcat is built for.
+To check that task training did not damage general Korean understanding, we evaluate \expone{}
+and the same-input zero-shot base model on public benchmarks that were never used for
+training, selection or calibration, through the same typed interface. The suite is KoBEST
+\citep{kim2022kobest} (BoolQ, COPA, WiC, HellaSwag, SentiNeg), KMMLU \citep{son2024kmmlu},
+the multiple-choice tasks of HAE-RAE Bench~1.1 \citep{son2023haerae} and CLIcK
+\citep{kim2024click}, with MMLU \citep{hendrycks2021mmlu} and HellaSwag
+\citep{zellers2019hellaswag} as English controls. On all four Korean benchmarks \expone{} is
+more accurate than the zero-shot model, by 4.6 to 6.9 points, and every 95\% interval lies
+above zero. On the English controls the difference is +3.7 points on MMLU and $-0.1$ points
+on HellaSwag (no difference). The numbers in this section are from
+\texttt{reports/2026-09-25-korean-external-benchmarks.json}.
+
+\subsection{Method}
+
+\paragraph{Data.}
+Each benchmark was downloaded from the Hugging Face Hub at a pinned dataset revision
+(Table~\ref{tab:kbench_sources}), and every file was checked against the Hub's listing (LFS
+SHA-256, or the git blob SHA-1 for files not stored in LFS) before use. We use the public
+test splits where they exist: the five KoBEST test sets, the 45 KMMLU test subjects and the
+MMLU test set; for HAE-RAE Bench~1.1 all eleven multiple-choice tasks (the two generative
+tasks, lyrics and proverb denoising, are excluded); and CLIcK in full. For HellaSwag we
+draw 2,000 items from the validation split with a fixed seed. Items whose text key matches a
+text key of the \expone{} training mixture (Section~\ref{sec:mixture}, 50,938 rows) were
+removed before evaluation: 3 from KoBEST and 1 from MMLU. One HAE-RAE item exceeds the
+8,192-token input limit of this run; it counts as a failure, and therefore as wrong, for both
+models. The public test splits are development data for Bobcat: nothing about the model
+was chosen by looking at them, but they are not a sealed split either.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Benchmark sources. Revisions are the first eight hexadecimal digits of the pinned
+Hub dataset revision. Items are counted after removing the four items whose text overlaps
+the training mixture.}
+\label{tab:kbench_sources}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}lllrl@{}}
+\toprule
+Benchmark & Hub dataset & Revision & Items & Composition \\
+\midrule
+KoBEST & \texttt{skt/kobest\_v1} & \texttt{a5ea15e3} & 4,558 & test, 5 tasks \\
+KMMLU & \texttt{HAERAE-HUB/KMMLU} & \texttt{d61b3f19} & 35,030 & test, 45 subjects \\
+HAE-RAE Bench 1.1 & \texttt{HAERAE-HUB/HAE\_RAE\_BENCH\_1.1} & \texttt{b480e810} & 3,606 & 11 multiple-choice tasks \\
+CLIcK & \texttt{EunsuKim/CLIcK} & \texttt{d6162785} & 1,995 & 11 categories \\
+\midrule
+MMLU (English) & \texttt{cais/mmlu} & \texttt{c30699e8} & 14,041 & test, 57 subjects \\
+HellaSwag (English) & \texttt{Rowan/hellaswag} & \texttt{218ec52e} & 2,000 & seeded sample of validation \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{Typed requests.}
+Each item becomes one request with one question and no examples. For KMMLU, HAE-RAE, CLIcK,
+MMLU and HellaSwag the question is a Choice whose candidates are the benchmark's own options,
+named \texttt{A} to \texttt{E}, with the option text as the candidate description; the state
+holds the item text (the question with its passage, if any, or the HellaSwag context), and
+the instruction is one
+short sentence in Korean, or in English for the controls (for KMMLU, ``choose the correct
+answer to the following question''). KoBEST keeps its task structure: BoolQ and WiC are Noul
+questions (the probability that the answer to the question is yes, and that the word has the
+same meaning in both sentences), and COPA, HellaSwag and SentiNeg are Choices over the two
+alternatives, the four endings and the two sentiment labels.
+
+\paragraph{Readout and arms.}
+The model generates nothing. It reads the logits of the offered candidate identifiers at the
+first answer position (Section~\ref{sec:readout}), as in the product path, and the answer is
+the argmax (for a Noul, \emph{true} if $P(\text{true})>0.5$). Both arms receive the same
+piecewise inputs (Section~\ref{sec:piecewise}) through the evaluation path of the sealed
+final (Section~\ref{sec:final}): \expone{} with its LoRA adapter unmerged, and the zero-shot
+arm with no adapter. Probabilities use each arm's product calibration temperature, fitted
+beforehand on the product calibration split (Section~\ref{sec:calibration}; $T=1.149$ for
+\expone{} and $T=1.26$ for the zero-shot model). Nothing was fitted, selected or tuned on these
+benchmarks.
+
+\paragraph{Metrics and intervals.}
+Accuracy counts failures as wrong. Chance is the mean of $1/K$ over a benchmark's items, $K$
+being the number of candidates. ECE uses ten equal-width bins of the top candidate
+probability over the scored items, both raw ($T=1$) and at the arm's temperature. The
+difference \expone{} minus zero-shot is reported with a paired 95\% percentile interval from
+1,000 cluster-bootstrap resamples. A cluster is a group of items that share a passage or an
+article (KoBEST, and the HAE-RAE and CLIcK items that come with a passage) or, for HellaSwag,
+a source video; every other item is its own cluster.
+
+\paragraph{Compute.}
+The run used one node of eight H100 GPUs for about 1.22\,h. The first attempt was cut off by
+an automatic operating-system reboot and was restarted.
+
+\subsection{Results}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Public benchmark accuracy (\%) through the typed first-position readout. $\Delta$ is
+\expone{} minus zero-shot in points, with a paired 95\% cluster-bootstrap interval. ECE is
+given raw and at the arm's product temperature $T$ (raw\,/\,$T$). Failures count as wrong
+(one HAE-RAE item, for both arms). MMLU and HellaSwag are the English controls.}
+\label{tab:kbench}
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}llrrrrlll@{}}
+\toprule
+ & & & & \multicolumn{2}{c}{Accuracy} & & \multicolumn{2}{c}{ECE (raw\,/\,$T$)} \\
+\cmidrule(lr){5-6}\cmidrule(l){8-9}
+Benchmark & Lang. & Items & Chance & Zero-shot & \expone{} & $\Delta$ [95\%] & \expone{} & Zero-shot \\
+\midrule
+KoBEST & ko & 4,558 & 47.3 & 88.3 & \textbf{95.2} & \textbf{+6.9} [+6.0, +7.7] & 0.009\,/\,0.021 & 0.047\,/\,0.077 \\
+KMMLU & ko & 35,030 & 25.0 & 58.1 & \textbf{64.1} & \textbf{+6.0} [+5.5, +6.4] & 0.076\,/\,0.049 & 0.068\,/\,0.028 \\
+HAE-RAE Bench 1.1 & ko & 3,606 & 20.0 & 66.8 & \textbf{72.3} & \textbf{+5.5} [+4.1, +6.9] & 0.058\,/\,0.030 & 0.021\,/\,0.035 \\
+CLIcK & ko & 1,995 & 24.4 & 71.5 & \textbf{76.1} & \textbf{+4.6} [+2.9, +6.1] & 0.045\,/\,0.024 & 0.027\,/\,0.023 \\
+\midrule
+MMLU & en & 14,041 & 25.0 & 80.6 & 84.3 & +3.7 [+3.2, +4.2] & 0.029\,/\,0.008 & 0.056\,/\,0.023 \\
+HellaSwag & en & 2,000 & 25.0 & 93.3 & 93.2 & $-0.1$ [$-1.0$, +0.9] & 0.029\,/\,0.050 & 0.013\,/\,0.036 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\figfile[width=0.85\linewidth]{figures/korean.pdf}
+\caption{Accuracy of \expone{} and the same-input zero-shot model on four Korean benchmarks
+and two English controls, with the chance level (dotted) and the paired difference in points
+with its 95\% cluster-bootstrap interval above each pair.}
+\label{fig:korean}
+\end{figure}
+
+Table~\ref{tab:kbench} and Figure~\ref{fig:korean} give the results. \expone{} is more
+accurate on every Korean benchmark, by +6.9 points on KoBEST, +6.0 on KMMLU, +5.5 on HAE-RAE
+and +4.6 on CLIcK, and each interval excludes zero. On the English controls the difference
+is +3.7 [+3.2, +4.2] on MMLU and $-0.1$ [$-1.0$, +0.9] on HellaSwag. Raw ECE of \expone{} is
+lower than that of the zero-shot model on KoBEST and MMLU and higher on KMMLU, HAE-RAE, CLIcK
+and HellaSwag.
+
+Table~\ref{tab:kbench_sub} breaks KoBEST and HAE-RAE down by task. The largest KoBEST gain is
+on WiC (90.9\% against 76.6\%), followed by BoolQ (+6.5) and HellaSwag (+5.8); COPA and
+SentiNeg, already near 97\% before training, move by about one point. Within HAE-RAE, CSAT
+geography (+16.7), CSAT law (+10.6), reading comprehension (+9.6) and general knowledge (+8.0)
+improve most, while date understanding does not improve (50.3\% against 51.2\%).
+
+\begin{table}[t]
+\centering
+\small
+\caption{KoBEST and HAE-RAE Bench~1.1 accuracy (\%) by task. Task names for HAE-RAE are the
+dataset's own identifiers. $\Delta$ is in points and is computed before rounding, so it can
+differ by 0.1 from the difference of the rounded accuracies. No per-task intervals were
+computed.}
+\label{tab:kbench_sub}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Benchmark & Task & Items & Zero-shot & \expone{} & $\Delta$ \\
+\midrule
+KoBEST & BoolQ (Noul) & 1,404 & 91.3 & 97.8 & +6.5 \\
+ & COPA (Choice) & 1,000 & 97.8 & 98.7 & +0.9 \\
+ & WiC (Noul) & 1,257 & 76.6 & \textbf{90.9} & \textbf{+14.3} \\
+ & HellaSwag (Choice) & 500 & 84.0 & 89.8 & +5.8 \\
+ & SentiNeg (Choice) & 397 & 96.2 & 97.2 & +1.0 \\
+\midrule
+HAE-RAE & \texttt{reading\_comprehension} & 936 & 74.3 & 83.9 & +9.6 \\
+ & \texttt{date\_understanding} & 475 & 51.2 & 50.3 & $-0.8$ \\
+ & \texttt{correct\_definition\_matching} & 439 & 85.2 & 86.1 & +0.9 \\
+ & \texttt{rare\_words} & 405 & 78.5 & 80.7 & +2.2 \\
+ & \texttt{csat\_socio} & 298 & 40.6 & 46.3 & +5.7 \\
+ & \texttt{csat\_law} & 217 & 41.0 & 51.6 & +10.6 \\
+ & \texttt{history} & 188 & 75.5 & 76.1 & +0.5 \\
+ & \texttt{general\_knowledge} & 176 & 51.1 & 59.1 & +8.0 \\
+ & \texttt{loan\_words} & 169 & 76.3 & 83.4 & +7.1 \\
+ & \texttt{standard\_nomenclature} & 153 & 82.4 & 88.2 & +5.9 \\
+ & \texttt{csat\_geo} & 150 & 54.0 & 70.7 & +16.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Interpretation and limitations}
+
+\paragraph{No forgetting; accuracy rose.}
+On these benchmarks we see no sign that task training damaged general Korean understanding.
+Training on the decision format (the first-position identifier readout) improved answer
+selection across multiple-choice questions in general. The gain is larger in Korean (4.6 to
+6.9 points) than in English (3.7 points on MMLU, none on HellaSwag); 82\% of the training rows
+were Korean (41,621 of 50,938, Table~\ref{tab:mixture}). We report the languages separately
+and do not average them.
+
+\paragraph{Part of the suite is close to the training distribution.}
+KoBEST BoolQ and SentiNeg resemble in form the English BoolQ training rows and the NSMC
+sentiment data used in training. Items whose text keys overlap the training mixture were
+removed, but transfer of the task type is still mixed into these two results. KMMLU, HAE-RAE
+and CLIcK are knowledge and culture questions with no similar data in training.
+
+\paragraph{Date calculation remains weak.}
+HAE-RAE date understanding stays near 50\% and does not improve. In the author-written probes
+(Section~\ref{sec:probes}) the only questions \expone{} missed were also sum calculations.
+Following the specification, calculation belongs in a code path, not in the model.
+
+\paragraph{Calibration differs by benchmark.}
+Applying the product temperature lowers the ECE of \expone{} on most benchmarks but raises it
+on KoBEST and HellaSwag. We did not calibrate per benchmark or per task.
+
+\paragraph{The readout baseline.}
+The zero-shot score is zero-shot \emph{in this decision format}. It can be lower than what the
+base model achieves with the benchmarks' official prompts or with generated answers. The
+differences above are therefore the improvement obtained when the model is used through the
+decision API, not evidence that the model's knowledge increased. For the same reason, these
+first-position scores are not comparable with official leaderboard numbers, which use each
+benchmark's official prompt and few-shot protocol.
+
+\paragraph{Contamination.}
+We did not measure whether the public base model saw these benchmarks during pretraining. The
+upstream test splits are development data for Bobcat, and the results describe the change
+caused by our training more reliably than the absolute level.

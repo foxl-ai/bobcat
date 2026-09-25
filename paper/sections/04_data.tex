@@ -1,0 +1,146 @@
+\section{Data}
+\label{sec:data}
+
+\subsection{Six-task product evaluation (v2)}
+\label{sec:evalv2}
+
+We froze the evaluation before evaluating any model on it. Its sources are native Korean
+text from KLUE machine reading comprehension (MRC) and Wizard of Seoul (WoS) dialogues
+\citep{park2021klue}, drawn from components that no Bobcat training, calibration or
+development data uses (6,028 rows), and a catalog of tool-call situations with explicit
+(task, command) label tables (372 rows from 12 situations). There is no machine translation.
+Table~\ref{tab:evalv2} lists the tasks.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Six-task evaluation v2: 6,400 decisions in 2,328 components. ``Components'' are
+contexts, dialogues or tool situations; splits are made at this level.}
+\label{tab:evalv2}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrp{4.0cm}p{4.0cm}@{}}
+\toprule
+Task & Rows & Comp. & Question families & Label basis \\
+\midrule
+Search passage selection & 1,726 & 712 & answers-query (Noul); title selection among 8, 77,
+  200 or 255 candidates (Choice) & MRC answerable/unanswerable marks (human); contrast
+  articles; source article \\
+Citation verification & 1,100 & 400 & supports / contradicts / says nothing & MRC answers;
+  altered numbers; other articles \\
+Tool-call review & 372 & 12 & scope, irreversible, plan mismatch & catalog tables of
+  (task, command) \\
+External document screening & 1,110 & 222 & instruction to the system; evidence under
+  injection & insertion rules for injected and benign notices; MRC answerability (human) \\
+Request routing & 1,092 & 482 & service (5 services); reservation & human slot-domain
+  annotation in WoS \\
+Classification & 1,000 & 500 & fine taxonomy (9 labels); coarse taxonomy (5 labels) &
+  publisher categories mapped to a new taxonomy \\
+\midrule
+Total & 6,400 & 2,328 & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Splits.}
+Components are assigned to development (3,188 decisions, 1,161 components), calibration
+(1,605) and final (1,607). No component crosses splits, there are no duplicate IDs, and rows
+that use another article as a contrast use only articles from the same split. Tool-call
+situations are assigned whole: six in development, three in final and the remaining three in
+calibration, so the three final situations were never seen during development. Per-task
+counts per split are in Appendix~\ref{app:tables}. Rebuilding with the recorded seed and
+source files reproduces the SHA256 of every split file.
+
+\paragraph{Counterfactual groups.}
+2,193 groups change exactly one condition within a component: an answerable and an
+unanswerable question on the same passage (human-written native pairs); a claim with the
+original number and with an altered number; the same command under different tasks (for
+example, a database reset command is \emph{expected} for a reset request and
+\emph{overreach} for a request to add a column); and the same article under the fine and the
+coarse taxonomy. We report the fraction of groups with a changing target in which every
+member is answered correctly.
+
+\paragraph{Invariance probes.}
+The same query is asked with 8, 77, 200 and 255 title candidates, and the same evidence
+judgment is asked before and after inserting injected text into the document.
+
+\paragraph{Label reliability.}
+Each row records how its label was obtained: 2,566 rows reuse the source's human
+annotation, 3,534 rows follow a clear rule that can occasionally fail (a contrast article
+may happen to contain the answer; publisher categories are noisy; catalog judgments), and
+300 rows are number-altered \emph{contradicts} cases that become wrong if the question
+admits several values. No row has been reviewed by a person. Reading samples confirmed that
+the classification labels are noisy (for example, an article about a card company's
+personnel reshuffle labelled as finance).
+
+\paragraph{Leakage controls.}
+We removed 27 MRC contexts whose normalized sentences exactly match KLUE NLI training
+premises or hypotheses, or YNAT training titles of at least 15 characters. This does not
+exclude near duplicates or exposure during the backbone's pretraining. Question and example
+IDs, source GUIDs and answer strings never appear in model input; question IDs are fixed per
+family. Rows were selected in an answer-independent hash order, except that routing uses a
+per-service quota of 160 and external document screening is balanced between answerable and
+unanswerable cases; both stratifications are recorded in the manifest.
+
+\paragraph{What the evaluation does not cover.}
+It has no Score primitive (the sources contain no native ordinal gold), no English side, and
+no model-routing task (difficulty or required capability); WoS provides only service
+routing. Title selection retains some ambiguity between articles on similar topics even
+though contrast titles were filtered to share no words with the query.
+
+\subsection{A lesson from version 1}
+\label{sec:v1bug}
+
+The first version of the evaluation stored rows with sorted JSON keys. This silently
+reordered every Choice \texttt{criteria} map alphabetically, while the row's list of
+candidate IDs kept the original order, so the order shown to the model and the gold index
+disagreed. The build audit ran before the rows were written and could not see this. The bug
+surfaced in the first readout (A.X-4.0-Light), which swapped two routing services almost
+everywhere and scored 15.8\% on citation verification, below chance; its task macro on v1
+was 43.1\%, against 62.4\% on v2. Noul rows, whose candidate order is fixed, were barely
+affected. Version 2 preserves key order, stores a per-row hash that changes when the
+candidate order changes, re-reads the saved files and compares the presented order with the
+candidate IDs; the readout refuses v1 files and aborts on any order mismatch. The general
+lesson is that audits must run on the exact bytes the model will read.
+
+\subsection{Training mixture}
+\label{sec:mixture}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Training mixture of \expone{} (one epoch).}
+\label{tab:mixture}
+\begin{tabular}{@{}p{10.8cm}r@{}}
+\toprule
+Part & Rows \\
+\midrule
+Task-type rows from KLUE MRC and WoS components not used by the evaluation & 25,144 \\
+Policy-transfer rows (prepared in an earlier stage of the project) & 7,752 \\
+Public gold: NLI, sentiment, news topic, intent, QA, mean ratings (STS, HelpSteer) & 18,042 \\
+\midrule
+Total (31,034 components, 36.25M tokens) & 50,938 \\
+\quad by primitive: Choice / Noul / Score & 25,621 / 20,082 / 5,235 \\
+\quad by language: Korean / English & 41,621 / 9,317 \\
+\midrule
+Removed: task-type rows whose text overlaps evaluation text & 8,798 \\
+Separate monitor split (training distribution) & 1,589 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:mixture} summarizes the mixture. The task-type rows are built by the same
+generators as the evaluation, from components the evaluation does not use, and their
+injected passages use wording different from the evaluation's. The public gold part adds
+NLI, sentiment, news-topic, intent and QA decisions and mean ratings from STS and HelpSteer
+\citep{wang2023helpsteer}; the mean ratings are supervised through the mean-rating loss of
+Section~\ref{sec:objectives}. The classification task received only 326 rows.
+
+\paragraph{Held-out task.}
+The tool-call review task is excluded from training altogether, so its evaluation measures
+transfer to an unseen task. The other five tasks share generators with the training data
+(with disjoint components), so their gains are in-distribution.
+
+\paragraph{No teacher or Jev signal.}
+Although the project's plan designates GLM-5.3-Flash as a permitted teacher, \expone{} was
+trained on gold labels only. Its manifest records that no teacher outputs and no Jev outputs
+were used.

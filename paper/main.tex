@@ -1,0 +1,132 @@
+\pdfoutput=1 % arXiv: build with pdfLaTeX (must stay within the first five lines)
+% Bobcat technical report.
+% Build:
+%   pdflatex main && bibtex main && pdflatex main && pdflatex main
+%   (or: latexmk -pdf -outdir=build main.tex)
+% Every number in this paper is taken from the Bobcat evaluation and training records.
+% Figures: scripts/paper_figures.py (see figures/README.md).
+
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{xcolor}
+\usepackage{microtype}
+% Lets TeX stretch a line instead of pushing unbreakable \texttt{...} names into the margin.
+\setlength{\emergencystretch}{1.5em}
+\usepackage[round,sort]{natbib}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!50!black,
+  pdftitle={Bobcat: Typed Decisions Read from First-Position Logits},
+  pdfauthor={Foxl AI}
+}
+
+% ================================================================ macros
+% Visible marker for work that is not finished. Search for "\todo{" before submission.
+\DeclareRobustCommand{\todo}[1]{\textcolor{red}{\textbf{[TODO:~#1]}}}
+\newcommand{\expone}{\texttt{bobcat-exp1}}
+% Figures are rendered separately (figures/README.md). A missing file becomes a framed
+% placeholder so the document still compiles.
+\newcommand{\figfile}[2][width=\linewidth]{%
+  \IfFileExists{#2}{\includegraphics[#1]{#2}}{%
+    \fbox{\parbox[c][0.22\textheight][c]{0.92\linewidth}{\centering\small
+      Figure placeholder: \texttt{\detokenize{#2}}\\[2pt]
+      (render from the JSON fields listed in \texttt{figures/README.md})}}}}
+
+\newtheorem{proposition}{Proposition}
+
+\title{Bobcat: Typed Decisions Read from First-Position Logits}
+
+\author{Foxl AI (\href{https://foxl.ai}{foxl.ai})}
+
+\date{2026-09-25}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Bobcat is a typed-decision model. A request carries a state (text or JSON) and one or more
+questions whose answer space the caller defines at request time: a \emph{Choice} among
+named candidates, a \emph{Noul} (the probability that a statement is true) or a
+\emph{Score} on an ordinal rubric. Bobcat never generates text for a decision. For each
+question it reads the logits of the offered single-token candidate identifiers at the first
+answer position of a language model, and the host builds a closed JSON reply from the
+caller's own names; a separate validator rejects any reply outside that contract. The
+model is Qwen3.8-27B (a hybrid of Gated DeltaNet and full-attention layers) with a rank-16
+LoRA adapter trained for one epoch on 50,938 labelled decisions, followed by scalar
+temperature calibration. On a sealed evaluation of six product tasks built from native
+Korean sources (1,607 decisions, evaluated once after freezing a release manifest),
+task-macro accuracy is 94.6\% against 84.5\% for the same-input zero-shot base model
+(+10.2 points, paired component-bootstrap 95\% interval [+7.7, +12.3]). The tool-call
+review task, never trained on, reaches 99.0\% against 79.2\% on 96 decisions drawn from only
+three situations. Across 12,846 HTTP requests to two models, including 2,304
+output-contract attacks per model, we observed no contract violation, and repeated requests
+returned bit-identical numbers. A REINFORCE objective with a proper-score reward, whose expected gradient equals that of
+the half Brier score, matched direct Brier training without exceeding it in two experiments;
+correctness-only reward worsened calibration. On the 20 workflow examples that TypeSafe
+published for its Jev model, Bobcat agrees with TypeSafe's reference consensus on 91.8\% of
+329 questions against 90.9\% for Jev's published answers (workflow-mean difference $-0.2$
+points [$-3.8$, $+4.8$]) and places more probability on the reference answer (0.889 against
+0.850), but is 3 to 19 times slower per case on its current single-L40S deployment. The main
+negative result is semantic: when a sentence in the state names a wrong answer, the model
+switches to that answer in 39.4\% of eligible cases after training, against 21.0\% before
+training. On one B300 GPU a 512-token, 8-candidate request takes 97\,ms at the median, and
+50\,ms on one H100 with vLLM and FP8 weights; batched throughput is about 16k input tokens
+per second on either GPU. The designated reference model has not yet been run on the same
+evaluation, so the release gates that compare against it are not judged. Bobcat is
+wire-compatible with TypeSafe's System One SDK; its LoRA adapter and code are released under
+Apache-2.0 (Section~\ref{sec:availability}).
+\end{abstract}
+
+\begin{figure}[t]
+\centering
+\figfile{figures/highlights.pdf}
+\caption{Bobcat at a glance. Left: accuracy against the same base model zero-shot on
+identical inputs. Right: agreement with TypeSafe's reference consensus against median time
+per case on TypeSafe's 20 published workflow examples (log scale); Jev, Opus 5 and Sol are
+TypeSafe's published answers and client-side times, Bobcat was run on one L40S, server-side.}
+\label{fig:highlights}
+\end{figure}
+
+\input{sections/01_introduction}
+\input{sections/02_interface}
+\input{sections/03_method}
+\input{sections/04_data}
+\input{sections/05_experiments}
+\input{sections/06_robustness}
+\input{sections/07_serving}
+\input{sections/08_korean_benchmarks}
+\input{sections/08b_typesafe_workflows}
+\input{sections/09_engine}
+\input{sections/10_limitations}
+\input{sections/11_availability}
+
+\section*{Acknowledgments and disclosure}
+The author-written probe set (Section~\ref{sec:probes}) and the ten additional tool-call
+situations (Section~\ref{sec:toolood}) were written and labelled by an AI assistant (Claude)
+working for the authors; neither set has been reviewed by a person.
+The manuscript, the evaluation and serving code, and the figures were prepared with the
+assistance of the same AI assistant working under the authors' direction; the authors take
+responsibility for all content. No person outside Foxl AI reviewed this work before release.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\appendix
+\input{sections/appendix_a_prompt}
+\input{sections/appendix_b_hyperparameters}
+\input{sections/appendix_c_compute}
+\input{sections/appendix_d_tables}
+
+\end{document}

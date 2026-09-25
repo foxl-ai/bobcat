@@ -1,0 +1,457 @@
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Protocol and statistics}
+\label{sec:protocol}
+
+\paragraph{Metrics.}
+The headline metric is task-macro accuracy: the unweighted mean of the six task accuracies,
+with failed requests counted as wrong. A Choice is correct if its argmax equals the gold
+candidate; a Noul if $P(\text{true})>0.5$ agrees with the gold. NLL is the mean negative
+log-likelihood of the gold candidate from a stable log-softmax. ECE uses ten equal-width bins
+of the top candidate probability $p_{\max}$ (not the \texttt{confidence} field of
+Section~\ref{sec:confidence}). ``Counterfactual all correct'' is the fraction of
+counterfactual groups with a changing target in which every member is correct.
+
+\paragraph{Intervals.}
+All intervals are 95\% percentile intervals from 1,000 bootstrap resamples of components
+(contexts, dialogues or tool situations). Differences between two models are paired: both
+are evaluated on the same resampled components. Because the tool-call task has only six
+development and three final components, its intervals understate the real uncertainty.
+
+\paragraph{Development and final.}
+The development split was observed repeatedly and was used to select the backbone, the arm
+and every setting. The final split was opened once, after the release manifest was frozen
+(Section~\ref{sec:final}). Development numbers are therefore optimistic in a way the final
+number is not.
+
+\subsection{Backbone selection}
+\label{sec:leaderboard}
+
+We compared eight pretrained backbones zero-shot through the same compiler and readout on the
+development split (3,188 decisions, 1,161 components), with whole-payload encoding, no
+calibration and no training. Seven ran with transformers 5.17.0 and Torch 2.12.1 in BF16 on
+L40S GPUs (two GPUs for the 27B and 35B-A3B models). DeepSeek-V4.1-Flash ran with its official
+reference inference code (tensor parallel 8, FP8 weights with FP4 experts) on eight B300
+GPUs. Table~\ref{tab:leaderboard} and Figure~\ref{fig:leaderboard} give the results; per-task
+accuracies are in Appendix~\ref{app:tables}.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Zero-shot backbone comparison on the development split (3,188 decisions). Task
+macro counts failed requests as wrong. Sizes are as recorded in our candidate records; ``--''
+means not recorded there. DeepSeek-V4.1-Flash returned all-NaN logits for 36 rows
+(1.1\%), which count as failures in the macro; its NLL and ECE use the 3,152 finite rows.}
+\label{tab:leaderboard}
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}llcrrrr@{}}
+\toprule
+Backbone & Size & GPUs & Macro (\%) & NLL & ECE & CF all (\%) \\
+\midrule
+Qwen3.8-27B & 27.8B dense, hybrid & 2$\times$L40S & \textbf{85.8} & \textbf{0.511} & \textbf{0.033} & \textbf{78.4} \\
+Gemma-4-12B-it & 12.0B dense & 1$\times$L40S & 84.9 & 1.350 & 0.130 & 72.2 \\
+Qwen3.6-35B-A3B & 36B MoE, 3B active & 2$\times$L40S & 82.8 & 0.668 & 0.072 & 67.1 \\
+Qwen3.5-9B & 9.7B dense, hybrid & 1$\times$L40S & 78.4 & 0.785 & 0.079 & 58.1 \\
+DeepSeek-V4.1-Flash & 763B MoE, 8B active in prefill & 8$\times$B300 & 75.2 & 1.448 & 0.158 & 52.9 \\
+A.X-4.0-Light & -- & 1$\times$L40S & 62.4 & 1.395 & 0.192 & 21.9 \\
+Phi-4-mini-instruct & -- & 1$\times$L40S & 49.0 & 2.480 & 0.337 & 0.0 \\
+Tri-7B & -- & 1$\times$L40S & 43.6 & 3.000 & 0.456 & 0.8 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\figfile[width=0.85\linewidth]{figures/leaderboard.pdf}
+\caption{Zero-shot development task-macro accuracy of the eight backbones
+(whole-payload encoding, failures counted wrong; ECE at the right), with \expone{} (piecewise
+encoding, after training) and the piecewise zero-shot Qwen3.8-27B as reference markers; the
+two encodings of the same zero-shot model differ slightly (85.8\% and 85.5\%). Development
+split, 3,188 decisions; not the sealed final.}
+\label{fig:leaderboard}
+\end{figure}
+
+\paragraph{Paired differences.}
+On task macro, Qwen3.8-27B minus Gemma-4-12B-it is +0.91 points [$-0.69$, +2.25], so the two
+are not distinguishable; Qwen3.8-27B exceeds Qwen3.6-35B-A3B by +3.01 [+1.37, +4.47] and
+Qwen3.5-9B by +7.42 [+5.98, +9.03]. Qwen3.8-27B is also the best calibrated without training
+(ECE 0.033), while Gemma-4-12B-it is overconfident (NLL 1.350).
+
+\paragraph{DeepSeek-V4.1-Flash on a fair subset.}
+Two factors penalize DeepSeek-V4.1-Flash in Table~\ref{tab:leaderboard}: NaN logits and
+identifiers. On the 2,963 decisions with at most 62 candidates, where every model uses GLM's
+identifiers, restricted to rows where DeepSeek's logits are finite, Qwen3.8-27B still leads
+by +7.53 points [+5.94, +9.03]. DeepSeek needs eight GPUs and is not better, so its small
+prefill-active parameter count does not help here; we keep it only as a possible reasoning
+teacher. This conclusion applies to reading the first position without thinking, not to
+DeepSeek's reasoning mode.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Title selection accuracy (\%) by number of candidates $K$, development split,
+75 questions per $K$ (DeepSeek-V4.1-Flash: finite rows only, 70 at $K=77$). Rows above the
+rule use whole-payload encoding; the last two use piecewise encoding. For Qwen and Gemma,
+$K\ge77$ uses extension letters as identifiers; the other models use GLM's multi-digit
+numerals.}
+\label{tab:kscaling}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Model & $K=8$ & 77 & 200 & 255 \\
+\midrule
+Qwen3.8-27B & 92.0 & 76.0 & 70.7 & 66.7 \\
+Gemma-4-12B-it & 93.3 & 74.7 & 72.0 & 68.0 \\
+Qwen3.6-35B-A3B & 93.3 & 77.3 & 69.3 & 45.3 \\
+Qwen3.5-9B & 89.3 & 81.3 & 41.3 & 34.7 \\
+DeepSeek-V4.1-Flash & 94.7 & 2.9 & 0.0 & 0.0 \\
+A.X-4.0-Light & 86.7 & 70.7 & 29.3 & 25.3 \\
+Phi-4-mini-instruct & 68.0 & 13.3 & 9.3 & 8.0 \\
+Tri-7B & 74.7 & 2.7 & 0.0 & 0.0 \\
+\midrule
+Qwen3.8-27B zero-shot, piecewise & 92.0 & 80.0 & 72.0 & 65.3 \\
+\expone{} (dev), piecewise & 92.0 & 86.7 & 86.7 & 81.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Many candidates and identifier choice.}
+Table~\ref{tab:kscaling} and Figure~\ref{fig:kscaling} show accuracy as the number of
+candidates grows. DeepSeek-V4.1-Flash has the best $K=8$ accuracy of all eight models
+(94.7\%) and collapses at $K\ge77$ (2.9\%, 0.0\%, 0.0\%); Tri-7B and Phi-4-mini-instruct
+collapse similarly. These three models used GLM's multi-digit numerals (\texttt{10},
+\texttt{11}, \dots) as identifiers. The numerals are single tokens, but we suspect the models
+tend to answer a number digit by digit, which a first-token readout cannot follow. Qwen and
+Gemma, which used letters for $K\ge77$, degrade gradually. A.X-4.0-Light also used the
+numerals throughout and falls more gradually (70.7\% at $K=77$, 25.3\% at $K=255$), so
+candidate count itself is a second cause. The two effects are confounded in this design; an
+identifier-only control has not been run. For future evaluations we use single-character
+identifiers for every model.
+
+\begin{figure}[t]
+\centering
+\figfile[width=0.75\linewidth]{figures/k_scaling.pdf}
+\caption{Title selection accuracy against the number of candidates $K$ (development split,
+75 questions per $K$). Shading marks $K\le62$, where all models share GLM's identifiers.
+For $K\ge77$, filled markers denote models that use extension letters (Qwen, Gemma) and open
+markers models that use GLM's multi-digit numerals (DeepSeek, A.X, Phi, Tri). Dashed lines use
+piecewise encoding. DeepSeek-V4.1-Flash is scored over finite rows only.}
+\label{fig:kscaling}
+\end{figure}
+
+\paragraph{Decision.}
+We selected Qwen3.8-27B: it had the highest macro, the best zero-shot calibration and fits
+on one GPU in BF16. Gemma-4-12B-it, statistically tied and less than half the size, remains
+the main smaller candidate.
+
+\subsection{LoRA fine-tuning and objective arms}
+\label{sec:arms}
+
+\paragraph{Setup.}
+All arms start from the same backbone and piecewise inputs. The baseline is the same model
+with the LoRA initialized at zero and evaluated without updates. The main arm,
+\texttt{sft\_vocab}, trains LoRA with cross-entropy for one epoch: 1,592 steps of 32
+questions (eight GPUs, four questions each, one question per forward), AdamW with learning
+rate $10^{-4}$, 3\% warmup and cosine decay, gradient clipping at 1.0, on one node of eight
+B300 GPUs (about 3.2\,s per step, peak memory 54.7\,GB per GPU). \texttt{sft\_pointer} adds the
+zero-initialized pointer head of Section~\ref{sec:pointer}. The continuation arms
+\texttt{rl}, \texttt{brier} and \texttt{ce} each continue from \texttt{sft\_vocab} for 300
+steps at learning rate $2\times10^{-5}$ with the same seed; \texttt{rl} uses four samples per
+question with a leave-one-out baseline. Temperatures are fitted on the calibration split and
+applied to development. The monitor split (1,589 rows) follows the training distribution.
+Appendix~\ref{app:hyper} lists all hyperparameters.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Training arms on the development split (3,188 decisions, 1,161 components).
+$\Delta$ is the paired difference in task macro against the zero-shot baseline, in points,
+with a 95\% component-bootstrap interval. Tool call is the held-out task. ECE@$T$ is ECE after
+the calibration-fitted temperature. Monitor is accuracy on the training-distribution monitor
+split. K255 is title selection with 255 candidates (75 questions).}
+\label{tab:arms}
+\setlength{\tabcolsep}{3.5pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}lrlrrrrrrr@{}}
+\toprule
+Arm & Macro & $\Delta$ [95\%] & Tool & NLL & ECE & $T$ & ECE@$T$ & Monitor & K255 \\
+\midrule
+Zero-shot (same input) & 85.5 & -- & 81.8 & 0.526 & 0.033 & 1.26 & 0.045 & 83.1 & 65.3 \\
+\texttt{sft\_vocab} (\expone) & \textbf{93.4} & +7.94 [+6.77, +9.02] & 95.0 & 0.236 & 0.015 & 1.15 & 0.011 & 95.5 & 81.3 \\
+\texttt{sft\_pointer} & 92.9 & +7.42 [+6.05, +8.64] & 92.3 & 0.239 & 0.017 & 1.16 & 0.010 & 96.1 & 81.3 \\
+\texttt{rl} (continued) & 93.3 & +7.80 [+6.60, +8.94] & 95.6 & 0.240 & 0.016 & 1.19 & 0.008 & 95.3 & 81.3 \\
+\texttt{brier} (continued) & 93.1 & +7.67 [+6.50, +8.81] & 95.6 & 0.236 & 0.016 & 1.14 & 0.008 & 96.2 & 81.3 \\
+\texttt{ce} (continued) & 93.2 & +7.68 [+6.48, +8.79] & 95.0 & 0.247 & 0.022 & 1.24 & 0.008 & 95.7 & 82.7 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{Supervised fine-tuning carries the gain.}
+One epoch of LoRA SFT raises development task macro from 85.5\% to 93.4\% (+7.94 points
+[+6.77, +9.02]) and counterfactual all-correct from 77.7\% to 94.7\%, and it lowers NLL from
+0.526 to 0.236 and the monitor's Score normalized MAE from 0.134 to 0.089 (Table~\ref{tab:arms};
+per-task results in Appendix~\ref{app:tables}). Restricted to the five trained tasks, the
+gain is +6.87 points [+5.57, +8.11]. Calibration behaves differently before and after
+training: the fitted temperature lowers the trained model's ECE from 0.015 to 0.011, but
+raises the zero-shot model's from 0.033 to 0.045. Classification remains the weakest task
+(77.6\%), with only 326 training rows and noisy labels.
+
+\paragraph{The pointer head was not used.}
+In \texttt{sft\_pointer} the pointer's scale started at zero and ended at $-0.0006$. LoRA solved
+the task through the vocabulary readout, so the pointer received no consistent gradient.
+This arm therefore did not test the pointer; Section~\ref{sec:limits} reports a retest.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Paired differences between continuation arms on the development split (same 300
+steps from \texttt{sft\_vocab}); 95\% component-bootstrap intervals.}
+\label{tab:continuation}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Comparison & Accuracy (points) & NLL \\
+\midrule
+RL $-$ Brier & +0.12 [$-0.15$, +0.41] & +0.004 [0.000, +0.008] \\
+RL $-$ CE & +0.11 [$-0.25$, +0.54] & $-0.007$ [$-0.013$, $-0.001$] \\
+Brier $-$ CE & $-0.01$ [$-0.31$, +0.34] & $-0.011$ [$-0.017$, $-0.006$] \\
+CE $-$ SFT & $-0.25$ [$-0.87$, +0.32] & +0.010 [+0.003, +0.018] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Proper-score objectives protect probabilities, not accuracy.}
+No continuation arm changes accuracy measurably (Table~\ref{tab:continuation}). Continuing
+with cross-entropy makes the model overconfident (NLL +0.010 [+0.003, +0.018] over SFT). RL
+and Brier avoid this: both have lower NLL than CE, and RL is slightly worse than Brier
+(+0.004 [0.000, +0.008]), which is consistent with RL being a higher-variance estimator of the
+same objective (Section~\ref{sec:objectives}). Where gold labels exist, direct Brier training
+gives the same effect more cheaply and more stably than sampling.
+
+\paragraph{Choice of candidate.}
+We took \texttt{sft\_vocab}, the arm with the highest development macro and the simplest
+design, attached its calibration temperature ($T=1.1489$) and named it \expone.
+
+\subsection{Sealed final}
+\label{sec:final}
+
+\paragraph{Freeze.}
+Before the final split was opened, a release manifest was frozen and committed. It binds the
+base revision, the tokenizer and template hashes, the adapter's SHA256, the calibration
+temperature 1.1489, the precision (BF16 weights, float32 readout), the decision rule (argmax,
+ties by request order; Noul true only if $P(\text{true})>0.5$) and the hash of the final
+file. The readout refuses to open the final split without such a manifest. The evaluation
+path was identical to development (unmerged LoRA, batch size 1). The baseline was the same
+piecewise input zero-shot, with the temperature 1.26 fitted on calibration beforehand. No
+setting was changed after the final results were seen, and the final split will not be
+reused for a later model. Appendix~\ref{app:compute} lists the manifest's hashes.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Sealed final split, evaluated once (1,607 decisions, all scored, none failed).
+$\Delta$ intervals are 95\% paired component-bootstrap intervals. The tool-call task was
+never trained on and has only three final situations.}
+\label{tab:final}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Task (decisions) & \expone{} & Zero-shot (same input) \\
+\midrule
+Search passage selection (432) & 88.2 & 77.1 \\
+Citation verification (275) & 100.0 & 91.6 \\
+Tool-call review (96, held out) & 99.0 & 79.2 \\
+External document screening (280) & 98.6 & 87.9 \\
+Request routing (274) & 99.3 & 97.1 \\
+Classification (250) & 82.8 & 74.0 \\
+\midrule
+Task macro & \textbf{94.6} & 84.5 \\
+$\Delta$ task macro (points) & \multicolumn{2}{c}{+10.2 [+7.7, +12.3]} \\
+$\Delta$ tool call (points) & \multicolumn{2}{c}{+19.8 [+12.5, +28.1]} \\
+Counterfactual all correct & 93.6 & 74.0 \\
+NLL, raw / at $T$ & 0.226 / 0.221 & 0.529 / 0.508 \\
+ECE, raw / at $T$ & 0.016 / 0.011 & 0.029 / 0.030 \\
+Temperature $T$ (fitted on calibration) & 1.1489 & 1.2596 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Results.}
+Table~\ref{tab:final} and Figure~\ref{fig:final} give the result. \expone{} reaches 94.6\%
+task macro against 84.5\% for the same-input zero-shot model, a paired difference of +10.2
+points [+7.7, +12.3]. The final result is not lower than development (93.4\%). The
+calibrated ECE is 0.011. All 1,607 requests were scored. Within search passage selection,
+title selection weakens as candidates increase: 94.7\% at $K=8$, 78.9\% at 77, 71.1\% at 200
+and 73.7\% at 255 (the zero-shot model ranges from 47\% to 71\% across these four settings).
+Classification is the weakest task at 82.8\%.
+
+\paragraph{What this does not establish.}
+The final labels have not been reviewed by a person. The project's release gate G1 requires
+non-inferiority against the GLM-5.3-Flash direct-logit readout on the same evaluation, which
+has not been run; this result alone therefore does not decide any release gate. The final
+split is Korean only.
+
+\begin{figure}[t]
+\centering
+\figfile[width=0.85\linewidth]{figures/final_tasks.pdf}
+\caption{Sealed final accuracy per task for \expone{} and the same-input zero-shot model,
+with the number of decisions per task. Tool-call review was never trained on.}
+\label{fig:final}
+\end{figure}
+
+\subsection{The held-out tool-call task}
+\label{sec:heldout}
+
+Tool-call review was absent from training. On development its accuracy rose from 81.8\% to
+95.0\% (+13.3 points [+11.6, +14.8], six situations, 181 decisions) and on the sealed final
+from 79.2\% to 99.0\% (+19.8 [+12.5, +28.1], three situations, 96 decisions). This is our
+clearest generalization signal, because the other five tasks come from generators that also
+produced training data. It rests on few independent units, however: with six and three
+situations, the component bootstrap cannot reflect situation-level variability well.
+
+\subsection{Ten unseen tool situations}
+\label{sec:toolood}
+
+To test the tool-call result on more situations, we wrote a catalog of ten situations that
+no training or evaluation split uses: cron jobs, DNS, payment refunds, training checkpoints,
+Linux accounts, CI, newsletters, a search index, backups and web deployment. Rows were built
+with the evaluation's generator (311 rows). The situations and labels were written by an AI
+assistant (Claude) following the conventions of the original catalog and have not been
+reviewed by a person.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Ten unseen tool-call situations (311 rows; AI-written labels, not human-reviewed).
+No intervals were computed for this set.}
+\label{tab:toolood}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Question family (rows) & \expone{} & Zero-shot \\
+\midrule
+Plan mismatch (160) & 95.6 & 70.6 \\
+Irreversible (80) & 98.8 & 90.0 \\
+Scope (71) & \textbf{88.7} & \textbf{91.5} \\
+\midrule
+Family macro & 94.4 & 84.1 \\
+Counterfactual all correct & 87.4 & 53.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The family macro of 94.4\% (Table~\ref{tab:toolood}) is close to the development tool-call
+accuracy (95.0\%), so the transfer holds on new situations. The scope family is the
+exception: \expone{} is 2.8 points below the untrained model (88.7\% against 91.5\%, 71 rows,
+so the difference is within noise at this size). The ability to compare an action with a
+stated plan appears to transfer from the trained tasks, while judging whether an action
+exceeds the request may have been disturbed.
+
+\subsection{Author-written bilingual probes}
+\label{sec:probes}
+
+We wrote 108 requests (126 questions) in situations the evaluation generators never
+produced: customer-support routing, English tool-call review, citations involving arithmetic
+and negation, reviews and e-mails with hidden instructions to an AI, human-facing notices
+and quotations that describe attacks, model-tier routing, Score rubrics (answer quality,
+code-review severity), spam, unsubscribe requests and satire, policy violations, code
+defects, three-question requests, and known weak spots (sums, elapsed dates, thresholds,
+units). Each concept has a Korean and an English version with the same expected answer
+(63 questions per language). The probes and their labels were written by an AI assistant
+(Claude) and have not been reviewed by a person; the set is small and has many easy items, so
+it has a ceiling. It is a sanity check, not a benchmark, and was never used for training,
+selection or calibration.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Author-written bilingual probes (126 questions, 63 per language; AI-written labels,
+not human-reviewed).}
+\label{tab:probes}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+ & \expone{} & Zero-shot \\
+\midrule
+All & 98.4 (124/126) & 95.2 (120/126) \\
+Korean / English & 98.4 / 98.4 & 93.7 / 96.8 \\
+Korean and English pair gives the same answer & 96.8 & 92.1 \\
+Mean probability on the expected answer & 0.959 & 0.877 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\expone{} missed two questions (Table~\ref{tab:probes}), both sums: it accepted an English
+invoice total that was wrong ($P(\text{yes})=0.56$) and rejected a Korean total that was right
+($P(\text{yes})=0.46$). Both probabilities are near 0.5, so the model was wrong without being
+confident. The untrained model missed six: the same two sums; ``540 of 1,200 people'' judged
+as supporting ``more than half'' in both languages (with probabilities of 0.68 to 0.70); 2,300\,g
+judged to be at most 2\,kg; and a Docker image prune judged irreversible. Among the probes both
+models answered correctly: a satirical review read as negative, a hidden
+\texttt{display:none} instruction flagged as injection while a human-facing administrator
+notice and a quotation describing an attack were not, a cancellation request that looked
+like a billing question routed to cancellation, \texttt{terraform apply} judged to exceed a
+request for a preview, and a full card number judged a policy violation. Arithmetic
+remains a weakness, and, as our specification requires, it belongs in code.
+
+\subsection{Earlier objective comparison on the GLM reference}
+\label{sec:glmrl}
+
+Before the student direction, we compared three objectives on GLM-5.3-Flash with a LoRA
+adapter, from the same parent checkpoint, for 35 updates each with the same data order and
+learning rate, on a different development set of 1,024 components (896 categorical
+decisions). Table~\ref{tab:glmrl} summarizes the result.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Earlier three-objective comparison on GLM-5.3-Flash (single seed; development data of
+a different evaluation: 896 categorical decisions, 562 of them native Korean).}
+\label{tab:glmrl}
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & Parent & Proper-score RL & Direct Brier & Correctness-only RL \\
+\midrule
+Correct / 896 & 796 & 802 & 802 & 799 \\
+Native Korean correct / 562 & 509 & 509 & 510 & 508 \\
+NLL & 0.34126 & 0.33594 & 0.33365 & 0.34545 \\
+ECE & 0.04515 & 0.04344 & 0.04163 & 0.05187 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+Proper-score RL changed accuracy by +0.67 points [0.00, +1.45] over the parent, and RL minus
+Brier was 0.00 points [$-0.67$, +0.67]. Temperature scaling alone applied to the parent
+(development cross-fitting) gave lower NLL (0.32550) and ECE (0.02061) than raw RL. We
+concluded that with gold labels, a direct proper-score loss plus temperature is the default,
+and that RL should return only where an outcome without gold labels can serve as the reward.
+The student experiments of Section~\ref{sec:arms} reproduce the same pattern.
+
+Two further observations from this run matter for how RL is used. First, most sampled
+updates carried no RL signal: in 77.5\% of the proper-score RL components and 81.4\% of the
+correctness-only components, all four samples received the same reward and the leave-one-out
+advantage was zero,
+so only the retention term moved the parameters. Second, rewarding correctness alone is not a
+neutral simplification for a model whose product is a probability. It was the only arm whose
+NLL and ECE rose above the parent's (Table~\ref{tab:glmrl}), which is what an improper reward
+that pays for confident correct answers should do.
+
+\begin{figure}[t]
+\centering
+\figfile{figures/rl.pdf}
+\caption{The two reinforcement-learning experiments. Top: continuing \expone{} for 300 steps
+(Table~\ref{tab:arms}). Bottom: GLM-5.3-Flash, 35 updates per objective from one parent
+(Table~\ref{tab:glmrl}). With gold labels, proper-score RL tracks the Brier loss it estimates;
+correctness-only reward is the arm that hurts calibration.}
+\label{fig:rl}
+\end{figure}
+
+\paragraph{Where RL returns.}
+Proposition~1 assumes that the loss can be evaluated for every candidate, which is true
+exactly when the gold label is known. When the only signal is a downstream outcome, such as a
+workflow that succeeded or a reviewer who overturned a decision, there is no closed-form loss to
+compute, and a sampled proper-score reward is the natural estimator. That is the setting of our
+next RL experiment, to be compared against the supervised and temperature-calibrated
+baseline of this section rather than against the untrained model.

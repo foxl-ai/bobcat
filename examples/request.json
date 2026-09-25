@@ -1,0 +1,20 @@
+[
+  {
+    "kind": "choice",
+    "context": "Apply the first matching rule. A later rule never overrides an earlier rule.\nRule 1: if score is at most 10, select amber-1400.\nIf no rule matches, select birch-1400.\nObserved facts:\nverified: true.\nsealed: false.\nurgent: false.\nscore: 7.",
+    "instruction": "Which action is selected by the stated policy and observed facts?",
+    "choices": [
+      {"id": "amber", "text": "amber-1400"},
+      {"id": "birch", "text": "birch-1400"}
+    ]
+  },
+  {
+    "kind": "boolean",
+    "context": "Apply the first matching rule. A later rule never overrides an earlier rule.\nRule 1: if score is at most 10, select amber-1400.\nIf no rule matches, select birch-1400.\nObserved facts:\nverified: true.\nsealed: false.\nurgent: false.\nscore: 7.",
+    "instruction": "Is the action selected by the policy amber-1400? Answer true or false using the stated rules and facts.",
+    "choices": [
+      {"id": "yes", "text": "true"},
+      {"id": "no", "text": "false"}
+    ]
+  }
+]

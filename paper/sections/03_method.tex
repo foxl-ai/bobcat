@@ -1,0 +1,196 @@
+\section{Method}
+\label{sec:method}
+
+\subsection{Compiler}
+\label{sec:compiler}
+
+The compiler turns one (state, question) pair into a token sequence. The prompt has a fixed
+system message, identical across backbones and identical to the one used by the project's
+GLM direct-logit readout, and one user message of compact JSON,
+\begin{center}
+\small
+\texttt{\{"state":}$S$\texttt{,"question":\{"type":}$\tau$\texttt{,"instructions":}$I$\texttt{,}\\
+\texttt{"candidates":[\{"identifier":}$\iota_1$\texttt{,"meaning":}$m_1$\texttt{\},\dots]\}\}}
+\end{center}
+where $S$ is the state as JSON, $\tau$ the question type, $I$ the instructions and $m_i$
+the meaning of candidate $i$: for a Choice the name, or the name and description together;
+for a Noul the descriptions of \emph{false} and \emph{true}; for a Score the level text.
+Appendix~\ref{app:prompt} gives the exact shape. Only the chat template and the tokenizer
+change between backbones. Templates are rendered with the model's own chat template in a
+sandboxed Jinja environment with thinking disabled (\texttt{enable\_thinking=False}); for
+DeepSeek-V4.1-Flash, which ships no template, we use its official encoding reference in
+chat mode. The compiler checks that the rendered template keeps exactly one insertion point
+for the state and one for the question and that it keeps the system text, and it verifies
+the checksums of the pinned tokenizer and template files before use.
+
+\subsection{Candidate identifiers}
+\label{sec:identifiers}
+
+Candidate $i$ is presented with identifier $\iota_i$, which must be one ordinary token of the
+backbone's vocabulary (not an added or control token), must decode back to itself, and must
+differ from every other identifier's token. The preference order is the list of 255
+identifier strings verified for the GLM readout, skipping any that is not a single token,
+followed by a fixed extension of Greek, Cyrillic, Hebrew, Latin-1, Armenian and Georgian
+letters. The GLM list starts with \texttt{A}--\texttt{Z}, \texttt{a}--\texttt{z} and
+\texttt{0}--\texttt{9} and continues with multi-digit numerals from \texttt{10} onward.
+Tokenizers that split digits, including those of the Qwen and Gemma models we tested, share
+only those first 62 identifiers with GLM. Questions with at most 62 candidates therefore use
+exactly GLM's identifiers, while the 77-, 200- and 255-candidate title questions use
+extension letters. DeepSeek-V4.1-Flash, A.X-4.0-Light, Phi-4-mini-instruct and Tri-7B encode
+all 255 GLM strings as single tokens and used them throughout. Section~\ref{sec:leaderboard}
+shows why this matters.
+
+\subsection{Untrusted text and the control vocabulary}
+\label{sec:datatok}
+
+The compiler uses two tokenizers built from the same files. The host tokenizer encodes the
+template segments and may produce control tokens. The data tokenizer is the same vocabulary
+and merge table with the list of added tokens removed, so no substring of the state,
+instructions or candidate text can be encoded as a control token, including added tokens
+that are not marked special (such as a thinking delimiter). Every data encoding is checked
+again for reserved token IDs. This boundary is a structural guarantee about token IDs; it is
+not a defence against semantic prompt injection.
+
+\subsection{Piecewise candidate encoding}
+\label{sec:piecewise}
+
+When the question JSON is encoded in one call, merges can cross candidate boundaries and the
+last token of a candidate is not well defined. In piecewise mode the compiler encodes the
+question head, each candidate object and each separator separately and asserts that the
+concatenated text is byte-identical to the compact JSON payload. This yields exact
+candidate end positions, which the pointer head in Section~\ref{sec:pointer} needs. All
+training, development, final and serving runs of \expone{} and its baseline use piecewise
+encoding. The backbone comparison in Section~\ref{sec:leaderboard} used whole-payload
+encoding; on the same development split Qwen3.8-27B scores 85.8\% whole-payload and 85.5\%
+piecewise. The text is identical in both modes; only the token segmentation differs.
+
+\subsection{First-position readout}
+\label{sec:readout}
+
+Let $h\in\mathbb{R}^d$ be the final hidden state at the last input position, which is the
+position at which the assistant's answer would begin, and let $W$ be the output embedding
+matrix. For offered identifier tokens $t_1,\dots,t_K$ the model's output is
+\begin{equation}
+  z_i = W_{t_i}^{\top} h, \qquad p = \operatorname{softmax}(z/T),
+\end{equation}
+computed in float32 from BF16 weights, with calibration temperature $T$. Nothing is sampled.
+For diagnosis we also record the log of the full-vocabulary probability mass that falls on
+the offered identifiers. For a Noul, the first two identifiers denote \emph{false} and
+\emph{true} in that order; for a Score, identifiers follow the level order. In an earlier check on the GLM
+path with real weights, 3 of 288 branches had a full-vocabulary argmax outside the offered
+candidates; because only candidate rows are read, that token was never sampled, decoded or
+returned.
+
+\subsection{Backbone}
+\label{sec:backbone}
+
+The backbone is \texttt{Qwen/Qwen3.8-27B} at revision \texttt{1d4bf0f2ff60}
+(Apache-2.0) \citep{qwen38_27b}. It has 27.8B parameters in a hybrid stack whose
+linear-attention layers (Gated DeltaNet, \citealp{yang2024gdn}) and full-attention layers
+alternate in a 3:1 ratio. We keep its original tokenizer and chat template and load BF16
+weights. It was chosen on the development split (Section~\ref{sec:leaderboard}).
+
+\subsection{LoRA adapter}
+\label{sec:lora}
+
+We attach LoRA \citep{hu2021lora} with rank $r=16$, $\alpha=32$ and no dropout to every
+linear projection of the full-attention layers (\texttt{q\_proj}, \texttt{k\_proj},
+\texttt{v\_proj}, \texttt{o\_proj}), the Gated DeltaNet layers (\texttt{in\_proj\_qkv},
+\texttt{in\_proj\_z}, \texttt{in\_proj\_a}, \texttt{in\_proj\_b}, \texttt{out\_proj}) and
+the MLPs (\texttt{gate\_proj}, \texttt{up\_proj}, \texttt{down\_proj}). The LM head and
+embeddings stay frozen, and any vision, merger or multi-token-prediction modules are
+excluded. The adapter has 116,727,808 trainable parameters; the base weights are frozen.
+The adapter changes only the hidden state $h$; the readout rows $W_{t_i}$ are the original
+ones.
+
+\subsection{Objectives}
+\label{sec:objectives}
+
+For one question with candidate logits $z$, $p=\operatorname{softmax}(z)$ and gold index
+$y$, we compare three losses.
+\begin{align}
+  \mathcal{L}_{\text{CE}} &= -\log p_y, \\
+  \mathcal{L}_{\text{Brier}} &= \tfrac12 \textstyle\sum_i \left(p_i - \mathbb{1}[i=y]\right)^2, \\
+  \mathcal{L}_{\text{RL}} &= -\tfrac14 \textstyle\sum_{j=1}^{4} (r_j - b_j)\log p_{a_j},
+  \quad a_j \overset{\text{iid}}{\sim} p,\;
+  r_j = \mathbb{1}[a_j=y] - \operatorname{sg}(p_{a_j}),\;
+  b_j = \tfrac13 \textstyle\sum_{k\neq j} r_k ,
+\end{align}
+where $\operatorname{sg}$ stops the gradient. The RL learner receives only whether each
+sampled action was correct. The reward $c_a - \operatorname{sg}(p_a)$ with independent action
+samples and a leave-one-out baseline follows Anthony Maio's \texttt{eve-rlcd}
+\citep{maio2026evercld} (MIT); our retention objective, distributed execution and evaluation
+are a different training setup, and no \texttt{eve-rlcd} checkpoint is used.
+
+\begin{proposition}
+The expected gradient of $\mathcal{L}_{\text{RL}}$ equals the gradient of
+$\mathcal{L}_{\text{Brier}}$.
+\end{proposition}
+\begin{proof}
+The baseline $b_j$ depends only on the other samples, which are independent of $a_j$, and
+$\mathbb{E}_{a\sim p}[\nabla\log p_a] = \sum_a \nabla p_a = 0$; so the baseline term has
+zero expectation. For the remaining term, with $c_a=\mathbb{1}[a=y]$,
+$\mathbb{E}_{a\sim p}\!\left[(c_a - p_a)\nabla\log p_a\right] = \sum_a (c_a-p_a)\nabla p_a
+= -\nabla \tfrac12\sum_a (p_a - c_a)^2$, because $c_a$ does not depend on the parameters.
+Negating gives $\mathbb{E}[\nabla\mathcal{L}_{\text{RL}}] = \nabla\mathcal{L}_{\text{Brier}}$.
+\end{proof}
+
+The RL arm therefore tests a sampled, higher-variance estimator of the half-Brier objective,
+not a new source of information. Rows whose supervision is an observed mean rating
+$\bar{s}$ (for example, STS and HelpSteer means) use the normalized squared error of the
+expected level under every objective,
+$\left(\left(\sum_i i\,p_i - \bar{s}\right)/(K-1)\right)^2$. This term fits a mean, not a
+distribution.
+
+\subsection{Residual pointer head (ablation)}
+\label{sec:pointer}
+
+As an architectural alternative to the vocabulary readout we add a residual bilinear score
+between the final hidden state and the hidden state at each candidate's last token $e_i$:
+\begin{equation}
+  z_i \leftarrow z_i + s\,\frac{(Q h)^{\top} (K_p\, h_{e_i})}{\sqrt{256}},
+  \qquad Q, K_p \in \mathbb{R}^{256\times d},
+\end{equation}
+with a learned scalar $s$. The pointer could correct identifier and list-position effects
+without depending on how identifiers tokenize. With $s=0$ at initialization the first step
+equals the vocabulary readout; Section~\ref{sec:limits} reports a retest that starts from
+$s=1$.
+
+\subsection{Temperature calibration}
+\label{sec:calibration}
+
+One scalar temperature $T$, shared by the three primitives, is fitted on the calibration
+split (1,605 decisions) by bounded minimization of the mean negative log-likelihood over
+$\log T\in[-3,3]$, and then applied unchanged to development and final data. It does not
+change any argmax. The fitted values are $T=1.1489$ for \expone{} and $T=1.2596$ for the
+zero-shot baseline.
+
+\subsection{Batching and shared-prefix branching}
+\label{sec:branching}
+
+The questions of one request are compiled into separate sequences and run as one
+right-padded batch with explicit position IDs. Each sequence is read at its own last
+position; because both causal attention and the causal linear-attention recurrence run left
+to right, padding placed after that position cannot affect it. Batches are split into
+chunks of at most 131,072 padded tokens.
+
+In shared-prefix mode the longest token prefix common to all of a request's sequences (the
+template, the state and the start of the question object) is prefilled once with a cache.
+For each chunk of suffixes the cache is deep-copied and expanded along the batch dimension,
+covering both the full-attention keys and values and the Gated DeltaNet convolution and
+recurrent states. The suffixes then run from the copy with positions offset by the prefix
+length; the parent cache is never modified. We checked, on a small random hybrid model with
+the GPU kernels and on the real model, that the implementation we use (transformers 5.17
+with flash-linear-attention kernels) carries the linear-attention state through a
+multi-token continuation. The API server's transformers engine uses this mode when the common
+prefix is at least 1,024 tokens. Section~\ref{sec:determinism} measures its numerical agreement with full
+sequences.
+
+\subsection{Usage accounting}
+\label{sec:usage}
+
+\texttt{usage.input\_tokens} counts the request's own content as the backbone tokenizer
+encodes it: the state once, plus each question's instructions, candidates and JSON
+punctuation. The fixed template and the per-question copies of the state are not counted.
+The number of tokens actually processed is reported separately in a response header. This
+counter is Bobcat's own definition and is not claimed to match TypeSafe's token counter.
