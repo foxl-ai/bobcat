@@ -85,14 +85,17 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 
 ## Quickstart: serve Bobcat on one GPU
 
-Tested on Linux with one NVIDIA L40S 48 GB (FP8) and one H100 80 GB (FP8 and BF16),
-vLLM 0.30.0, CUDA 13. The adapter is merged into the base weights for serving.
+Tested end to end from a fresh clone on Linux with one NVIDIA L40S 48 GB (FP8): about 3.5
+minutes to download the base, 6.5 minutes to merge and 5.5 minutes until the server is ready.
+The same artifact was also measured on one H100 80 GB (FP8 and BF16) with vLLM 0.30.0. The
+adapter is merged into the base weights for serving.
 
 ```bash
 git clone https://github.com/foxl-ai/bobcat && cd bobcat
+export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
 uv venv --python 3.12 .venv-serve
 uv pip install --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
-  "tokenizers>=0.21" huggingface_hub
+  "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
 # 1. The base model at the pinned revision (every file's hash is verified)
@@ -113,7 +116,6 @@ VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model mod
 Then call it with the official SDK:
 
 ```python
-# pip install typesafe-sdk==0.7.1
 import os
 os.environ.update(TYPESAFE_BASE_URL="http://127.0.0.1:8000", TYPESAFE_API_KEY="local",
                   TYPESAFE_DEFAULT_MODEL="bobcat-1")
@@ -155,7 +157,7 @@ These are ordinary GPU Linux hosts; the Quickstart above is the whole recipe.
   endpoint needs a custom container that runs `bobcat.api_server` behind SageMaker's
   `/invocations` and `/ping` routes; we have not published or tested one yet.
 
-We tested the EC2 path. The SageMaker paths are described here but not yet tested by us.
+We tested the recipe on an EC2 L40S host. The SageMaker paths are described here but not yet tested by us.
 
 ## Evaluation
 

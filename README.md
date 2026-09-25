@@ -48,9 +48,10 @@ On one Linux GPU host (tested: one L40S 48 GB with FP8, one H100 80 GB):
 
 ```bash
 git clone https://github.com/foxl-ai/bobcat && cd bobcat
+export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
 uv venv --python 3.12 .venv-serve
 uv pip install --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
-  "tokenizers>=0.21" huggingface_hub
+  "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
 $PY -m bobcat.student_readout download --repo Qwen/Qwen3.8-27B \
