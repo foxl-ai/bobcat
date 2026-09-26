@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme/bobcat.svg" width="64" height="64" alt="Bobcat" />
+  <a href="https://foxl.ai"><img src="assets/readme/foxl.svg" width="64" height="64" alt="Foxl" /></a>
 </p>
 
 <h1 align="center">Bobcat</h1>
