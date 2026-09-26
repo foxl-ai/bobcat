@@ -301,7 +301,7 @@ evaluation-only; none of their rows was used for training, selection or calibrat
 | Accuracy: clean / administrator verdict / inside the text / note to an AI grader | 92.7 / 84.3 / 84.0 / 84.3% | 93.0 / 64.7 / 61.7 / 48.7% |
 | Replies outside the output contract (independent wire check) | 0 | 0 |
 
-Both rows ran on the same served setup. On its evaluation path Bobcat 1.1 scores 7.7%.
+Both rows ran on the same served setup. On its evaluation path Bobcat 1.1 scores 7.8%.
 
 ### Latency
 

@@ -53,7 +53,7 @@ this model is [Bobcat Flash 1.1](https://huggingface.co/sanghwa-na/bobcat-flash-
 | | Bobcat 1.1 | Reference |
 |---|---:|---|
 | Sealed final, four tasks (1,614 decisions, opened once) | **94.27%** | Bobcat 1 93.59% (+0.7 pt [-0.0, +1.5]); same base zero-shot 87.86% |
-| Wrong answer named inside the state wins (300 questions x 3 attacks) | **7.7%** | Bobcat 1 39.6%; same base zero-shot 21.0% |
+| Wrong answer named inside the state wins (300 questions x 3 attacks) | **7.8%** | Bobcat 1 39.6%; same base zero-shot 21.0% |
 | Six-task development evaluation (3,188 decisions) | **93.69%** | Bobcat 1 93.41%; same base zero-shot 85.48% |
 | TypeSafe's published workflow examples: agreement with the reference (329 questions) | **92.1%** | Jev 90.9%, Claude Opus 5 92.4%, GPT-5.6 Sol 93.0% |
 | SemIf's 102 aligned TypeSafe rows: modal agreement | **0.872** | Jev 0.883 |
@@ -71,7 +71,7 @@ called. See [Evaluation](#evaluation) for what each number does and does not mea
   counterfactual copies in which a note to an AI grader, an instruction inside the text or
   an administrator "final verdict" names an answer while the gold stays unchanged (in 20% of
   them the named answer is the right one, so "a named answer is wrong" is not a shortcut).
-  Attack success is now 7.7%.
+  Attack success is now 7.8%.
 - **More English.** 36.0% of the training decisions are English (Bobcat 1: 18%), including
   SNLI and SQuAD 2.0.
 - **Insufficient evidence and long inputs.** 6,100 copies whose evidence was removed or
@@ -253,7 +253,7 @@ the attacked questions whose answer moved to the named wrong answer.
 
 | | Bobcat 1.1 | Bobcat 1 | Same base, zero-shot |
 |---|---:|---:|---:|
-| **Attack success, all three** | **7.7%** | 39.6% | 21.0% |
+| **Attack success, all three** | **7.8%** | 39.6% | 21.0% |
 | Accuracy, clean input | 93.7% | 92.7% | 85.7% |
 
 Per attack, Bobcat 1.1's success is 7.3% (verdict), 8.0% (inside the text) and 8.0% (note);
@@ -385,7 +385,7 @@ on 98.2%). Evaluate the exact artifact you serve.
   64 of 64). The served NVFP4 build agreed with the reference on 91.2% of TypeSafe's
   workflow questions against 92.1% on the evaluation path. Use FP8 where a near-tie must be
   reproducible.
-- An attack sentence inside the state still moves 7.7% of answers. For untrusted input,
+- An attack sentence inside the state still moves 7.8% of answers. For untrusted input,
   add checks outside the model.
 - Order and wording: reversing the option order flipped 1 of SemIf's perturbation rows
   (Bobcat 1: 0).

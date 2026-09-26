@@ -45,7 +45,7 @@ server-side over localhost HTTP, one decision is 512 tokens with 8 candidates me
 the vLLM engine. On TypeSafe's 20 published workflow examples (329 questions) Jev agrees
 with the reference on 90.9% at 0.42 s per case (TypeSafe's published client-side time);
 Jev was never called. Bobcat 1.1 cut the rate at which a wrong answer named inside the state
-wins from 39.6% (Bobcat 1) to 7.7%. Flash answers most questions itself and can hand the
+wins from 39.6% (Bobcat 1) to 7.8%. Flash answers most questions itself and can hand the
 ones it is unsure about to Bobcat 1.1 in one server (`bobcat.route_server`).
 
 The model cards give every number with its conditions and limits, including the targets

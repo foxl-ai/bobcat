@@ -9,6 +9,7 @@ description = "Korean-first typed decision models with auditable training and ev
 requires-python = ">=3.12,<3.15"
 dependencies = [
   "torch==2.13.0",
+  "safetensors>=0.5,<1",
   "numpy>=2,<3",
   "tokenizers>=0.21,<0.24",
   "scipy>=1.15,<2",
