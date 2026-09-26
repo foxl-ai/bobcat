@@ -18,6 +18,8 @@ INTERNAL = {
                 "usd_per_mtok_at_9_99_per_hour": 0.5,
                 "cost_estimate": {"usd": 1.0}, "gpu_memory_nvidia_smi": ["1 MiB"],
                 "w1_p50_ms": 24.8},
+    "selection": {"preregistration": {"file": ".aws-local/prereg-x.json (internal)",
+                                      "sha256": "e" * 64}},
 }
 CARD = """---
 license: apache-2.0
@@ -69,6 +71,7 @@ def test_public_manifest_drops_storage_cost_and_orchestration():
     assert set(serving) == {"note", "tool", "w1_p50_ms"}
     assert serving["note"] == "measured on one RTX PRO 6000; dev rows"
     assert serving["tool"].startswith("scripts/nvfp4_quantize.py")
+    assert out["selection"]["preregistration"]["file"] == "an internal file"
     assert out["public_copy"]["derived_from_sha256"] == "e" * 64
     assert shr.blocked(text, manifest=True) == []
     assert "instance-type" in shr.blocked(shr.render(INTERNAL), manifest=True)

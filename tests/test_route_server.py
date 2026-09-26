@@ -50,7 +50,7 @@ BIG_TABLE = {"confident": [0.0, 4.0], "unsure": [0.0, 2.0], "many": [0.0, 3.0],
              "other": [0.0, 1.0]}
 
 
-def routed(tmp_path, *, big_fail=False, allow_override=False, big_limit=None):
+def routed(tmp_path, *, big_fail=False, allow_override=False, big_limit=None, policy=None):
     flash_compiler = api_server.cache_state_encoding(char_student(tmp_path / "flash", IDS))
     big_compiler = api_server.cache_state_encoding(char_student(tmp_path / "big", IDS))
     if big_limit is not None:
@@ -58,7 +58,8 @@ def routed(tmp_path, *, big_fail=False, allow_override=False, big_limit=None):
     flash = Recording("flash", flash_compiler, FLASH_TABLE)
     big = Recording("big", big_compiler, BIG_TABLE, fail=big_fail)
     engine = RoutedEngine(Tier("flash", flash, flash_compiler, T_FLASH),
-                          Tier("bobcat-1.1", big, big_compiler, T_BIG), RoutePolicy(),
+                          Tier("bobcat-1.1", big, big_compiler, T_BIG),
+                          policy or RoutePolicy(max_flash_tokens=None),
                           allow_override=allow_override)
     app = api_server.create_api(engine, flash_compiler, model_name="bobcat-flash-1.1",
                                 aliases={"bobcat-latest"}, temperature=T_FLASH, models=MODELS,
@@ -187,7 +188,8 @@ def test_out_of_range_questions_start_on_bobcat_beside_flash(tmp_path):
             return [[3.0] + [0.0] * (len(o) - 1) for o in option_ids]
 
     engine = RoutedEngine(Tier("flash", Slow("flash"), flash_compiler, T_FLASH),
-                          Tier("bobcat-1.1", Slow("big"), big_compiler, T_BIG))
+                          Tier("bobcat-1.1", Slow("big"), big_compiler, T_BIG),
+                          RoutePolicy(max_flash_tokens=None))
     _, questions = parse_request({"model": "m", "state": "s", "questions": {
         "a": noul("confident"),
         "c": {"type": "choice", "instructions": "many",
@@ -198,3 +200,98 @@ def test_out_of_range_questions_start_on_bobcat_beside_flash(tmp_path):
     assert sorted(events[:2]) == ["start big", "start flash"]  # both run before either ends
     assert temperatures == [T_FLASH, T_BIG] and headers["x-bobcat-route"] == "flash,bobcat"
     assert processed == len(compiled[0][0]) + len(big_compiler.compile("s", questions[1])[0])
+
+
+def flash_length(tmp_path, state, question):
+    compiler = char_student(tmp_path / "measure", IDS)
+    _, (parsed,) = parse_request({"model": "m", "state": state, "questions": {"q": question}})
+    return len(compiler.compile(state, parsed)[0])
+
+
+def test_the_length_rule_is_on_by_default_and_decided_from_the_flash_sequence():
+    state, (question,) = parse_request({"model": "m", "state": "s",
+                                        "questions": {"q": noul("confident")}})
+    assert RoutePolicy().max_flash_tokens == 2048                 # the dev-selected default
+    assert RoutePolicy().out_of_range(state, question, 2048) is None
+    assert RoutePolicy().out_of_range(state, question, 2049) == "length"
+    off = RoutePolicy(max_flash_tokens=None)
+    assert off.out_of_range(state, question, 10**9) is None
+    capped = RoutePolicy(max_flash_tokens=100)
+    assert capped.out_of_range(state, question, 100) is None      # equal stays on Flash
+    assert capped.out_of_range(state, question, 101) == "length"
+    assert capped.out_of_range(state, question) is None           # no length known: no rule
+    many = parse_request({"model": "m", "state": "s", "questions": {"q": {
+        "type": "choice", "instructions": "many",
+        "criteria": {f"c{i}": None for i in range(70)}}}})[1][0]
+    assert capped.out_of_range(state, many, 10**6) == "candidates"  # earlier rules first
+
+
+def test_long_questions_go_to_bobcat_before_flash_scores_them(tmp_path):
+    short_state, long_state = {"doc": "short"}, {"doc": "long " * 200}
+    limit = flash_length(tmp_path, short_state, noul("confident"))
+    assert flash_length(tmp_path, long_state, noul("confident")) > limit
+    api, flash, big = routed(tmp_path, policy=RoutePolicy(max_flash_tokens=limit))
+    short = {"model": "bobcat-latest", "state": short_state,
+             "questions": {"a": noul("confident")}}
+    reply = api.post("/v1/systemone", json=short)
+    assert reply.status_code == 200
+    assert reply.headers["x-bobcat-route"] == "flash"
+    assert reply.headers["x-bobcat-route-reasons"] == "in_range"
+    body = {"model": "bobcat-latest", "state": long_state,
+            "questions": {"a": noul("confident"), "b": noul("unsure")}}
+    reply = api.post("/v1/systemone", json=body)
+    assert reply.status_code == 200
+    inspect_reply(body, reply, expected_model="bobcat-flash-1.1")
+    assert reply.headers["x-bobcat-route"] == "bobcat,bobcat"
+    assert reply.headers["x-bobcat-route-reasons"] == "length,length"
+    assert flash.seen == ["confident"]                 # only the short request reached Flash
+    assert sorted(big.seen) == ["confident", "unsure"]
+    answers = reply.json()["answers"]
+    assert abs(answers["a"]["noul"] - softmax(BIG_TABLE["confident"], T_BIG)[1]) < 1e-12
+
+
+def test_a_long_question_does_not_move_the_short_questions_beside_it(tmp_path):
+    state = {"doc": "shared"}
+    long_question = noul("other " + "x" * 400)
+    limit = flash_length(tmp_path, state, noul("confident")) + 20
+    assert flash_length(tmp_path, state, long_question) > limit
+    table = {**FLASH_TABLE, long_question["instructions"]: [3.0, 0.0]}
+    flash_compiler = api_server.cache_state_encoding(char_student(tmp_path / "flash", IDS))
+    big_compiler = api_server.cache_state_encoding(char_student(tmp_path / "big", IDS))
+    flash = Recording("flash", flash_compiler, table)
+    big = Recording("big", big_compiler, {**BIG_TABLE, long_question["instructions"]: [0, 1]})
+    engine = RoutedEngine(Tier("flash", flash, flash_compiler, T_FLASH),
+                          Tier("bobcat-1.1", big, big_compiler, T_BIG),
+                          RoutePolicy(max_flash_tokens=limit))
+    api = TestClient(api_server.create_api(engine, flash_compiler, model_name="bobcat-flash-1.1",
+                                           aliases={"bobcat-latest"}, temperature=T_FLASH,
+                                           models=MODELS, edge_secret=None))
+    seen = {}
+    for questions in ({"a": noul("confident")},
+                      {"a": noul("confident"), "z": long_question},
+                      {"z": long_question, "b": noul("unsure"), "a": noul("confident")}):
+        reply = api.post("/v1/systemone", json={"model": "bobcat-latest", "state": state,
+                                                "questions": questions})
+        assert reply.status_code == 200
+        routes = reply.headers["x-bobcat-route"].split(",")
+        reasons = reply.headers["x-bobcat-route-reasons"].split(",")
+        for qid, route, reason in zip(questions, routes, reasons, strict=True):
+            seen.setdefault(qid, set()).add((route, reason,
+                                             repr(reply.json()["answers"][qid])))
+    assert seen["a"] == {("flash", "in_range", next(iter(seen["a"]))[2])}
+    assert {(r, why) for r, why, _ in seen["z"]} == {("bobcat", "length")}
+    assert all(len(v) == 1 for v in seen.values()), seen
+
+
+def test_a_long_question_bobcat_cannot_compile_keeps_the_flash_answer(tmp_path):
+    state = {"doc": "long " * 50}
+    length = flash_length(tmp_path, state, noul("confident"))
+    api, flash, big = routed(tmp_path, big_limit=length - 1,
+                             policy=RoutePolicy(max_flash_tokens=length - 10))
+    body = {"model": "bobcat-latest", "state": state, "questions": {"q": noul("confident")}}
+    reply = api.post("/v1/systemone", json=body)
+    assert reply.status_code == 200
+    inspect_reply(body, reply, expected_model="bobcat-flash-1.1")
+    assert reply.headers["x-bobcat-route"] == "flash"
+    assert reply.headers["x-bobcat-route-reasons"] == "bobcat_limit"
+    assert big.seen == [] and flash.seen == ["confident"]

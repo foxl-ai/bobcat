@@ -55,18 +55,21 @@ server. The compiler, servers and evaluation code are at
 
 | | Bobcat Flash 1.1 | Reference |
 |---|---:|---|
-| Median time per TypeSafe workflow case, served | **0.297 s** | Jev 0.42 s (TypeSafe's published client-side time); Bobcat 1.1 0.52-0.58 s |
-| One decision (512 tokens, 8 candidates), p50 | **24.8 ms** | one RTX PRO 6000 Blackwell, FP8, vLLM engine; Bobcat 1.1 42.8 ms (NVFP4) |
+| Median time per TypeSafe workflow case, client-side over HTTPS (cold server) | **0.25 s** same datacenter; **0.42 s** from another region | Jev 0.42 s (TypeSafe's published client-side time) |
+| Same, server-side over localhost | **0.297 s** | Bobcat 1.1 0.52-0.58 s (NVFP4) |
+| One decision (512 tokens, 8 candidates), p50 | **24.8 ms** engine; **27 ms** client-side, same datacenter | one RTX PRO 6000 Blackwell, FP8, vLLM; Bobcat 1.1 42.8 ms engine (NVFP4) |
 | TypeSafe's published workflow examples: agreement with the reference (329 questions) | **91.2%** | Jev 90.9%, Claude Opus 5 92.4%, GPT-5.6 Sol 93.0% |
 | SemIf's 102 aligned TypeSafe rows: modal agreement | **0.896** | Jev 0.883 |
 | Sealed final, four tasks (1,614 decisions, opened once) | **92.21%** | Bobcat 1.1 94.27% (-2.1 pt [-3.0, -1.2]); Bobcat 1 93.59% |
 | Six-task development evaluation (3,188 decisions) | **92.07%** | Bobcat 1.1 93.69%; same base zero-shot 86.6% |
 | Wrong answer named inside the state wins | **9.7%** | Bobcat 1 38.6%, same server setup |
-| Routed server: Flash first, unsure questions to the 27B model (development) | **93.11%**, 84.2% answered by Flash | the 27B model alone 93.41% (see [Routing](#routing-to-bobcat-11)) |
+| Routed server, development split (Flash first; unsure, out-of-range and over-2,048-token questions to Bobcat 1.1) | **93.15%**, 84.0% answered by Flash | Bobcat 1.1 alone 93.54% |
+| Same, states padded to 8K / 16K / 30K tokens | **equal to Bobcat 1.1 alone** (92.0 / 91.3 / 92.7%) | Flash alone -7.3 pt at 30K |
 
 Jev, Opus 5 and Sol figures are TypeSafe's own published answers and times; Jev was never
-called. Flash is less accurate than Bobcat 1.1, most of all on search passage selection;
-see [Limitations](#limitations-and-risks).
+called. Flash is less accurate than Bobcat 1.1, most of all on search passage selection and
+long states, which the routed server sends to Bobcat 1.1; see
+[Limitations](#limitations-and-risks).
 
 ## What it does
 
@@ -160,13 +163,26 @@ only:
 
 1. **Out of range, before any forward pass:** more than 64 candidates, or fewer than half
    of the letters Hangul or Latin (Flash was trained and evaluated on Korean and English
-   only). The question goes straight to Bobcat 1.1.
-2. **Otherwise Flash scores it.** If Flash's calibrated top probability is below 0.8 (a
+   only).
+2. **Too long, before any forward pass:** the question's Flash-compiled sequence (its
+   state plus the question) is longer than 2,048 Flash tokens (`--max-flash-tokens`,
+   default 2048; `0` turns the rule off). Flash loses accuracy as the state grows (see
+   [Long inputs](#long-inputs)); Bobcat 1.1 keeps it.
+3. **Otherwise Flash scores it.** If Flash's calibrated top probability is below 0.8 (a
    threshold chosen on the calibration split), Bobcat 1.1 compiles and scores it again.
 
+Questions sent on by the first two rules start on Bobcat 1.1 at once, beside the Flash pass.
 Each answer carries the probabilities of the model that scored it, at that model's
 calibration temperature, and the `x-bobcat-route` header names that model per question.
-Questions never see each other.
+Questions never see each other: a long question does not move the short questions of the
+same request.
+
+The 2,048 threshold was chosen on the development split only, by a rule written down before
+any score existed: the largest threshold at which routed accuracy stays within 1 point of
+Bobcat 1.1 alone at every padded state length from 0 to 8K tokens (only 1,024 and 2,048
+qualified). A separate 300-question development holdout was scored for the record and did
+not change it: at 3K-8K it matches Bobcat 1.1; unpadded and at 1K it is 1.3 points (4 of 300
+questions) below, from the confidence rule, which the length rule does not touch there.
 
 ```bash
 # Flash as above (model/, base/); Bobcat 1.1 merged as in its card (b11-model/, b11-compiler/)
@@ -174,30 +190,36 @@ VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.route_server \
   --flash-model model --flash-compiler-model base --flash-temperature 0.8912 \
   --flash-quantization fp8 --flash-gpu-memory-utilization 0.40 \
   --big-model b11-model --big-compiler-model b11-compiler --big-temperature 1.2008 \
-  --big-gpu-memory-utilization 0.46 --max-model-len 32832 --schedule all \
-  --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
+  --big-gpu-memory-utilization 0.46 --max-flash-tokens 2048 --max-model-len 32832 \
+  --schedule all --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
 ```
 
-On the development split (3,188 requests, one at a time over localhost HTTP):
+Measured with Flash in FP8 and the released Bobcat 1.1 in an NVFP4 build
+(`--big-quantization none` on a checkpoint made with `scripts/nvfp4_quantize.py`), one
+request at a time over loopback HTTP on the server host:
 
-| Server | Task macro | Answered by Flash | Latency p50 / p95 / mean |
-|---|---:|---:|---|
-| **Routed** | **93.11%** | 84.2% | 33.3 / 215.7 / 64.4 ms |
-| Flash only | 92.12% | 100% | 32.3 / 90.2 / 42.5 ms |
-| 27B model only | 93.41% | 0% | 61.4 / 216.1 / 90.9 ms |
+| Input (Flash tokens) | Questions | **Routed** | Flash alone | Bobcat 1.1 alone | Answered by Flash | Latency p50: routed / Flash / Bobcat 1.1 |
+|---|---:|---:|---:|---:|---:|---|
+| Development split, unpadded | 3,188 | **93.15%** | 92.16% | 93.54% | 84.0% | 33 / 32 / 61 ms |
+| State padded to 8K | 300 | **92.0%** | 86.0% | 92.0% | 0% | 452 / 276 / 436 ms |
+| State padded to 16K | 300 | **91.3%** | 84.3% | 91.3% | 0% | 952 / 703 / 951 ms |
+| State padded to 30K | 300 | **92.7%** | 83.7% | 92.7% | 0% | 1,990 / 1,801 / 1,982 ms |
 
-Routed minus Flash: +0.98 points [+0.32, +1.70]; routed minus the 27B model: -0.30
-[-0.77, +0.18]. Questions Flash answered took 32.2 ms at p50; those handed on for low
-confidence 93.8 ms; those with more than 64 candidates 480 ms. On TypeSafe's 20 English
-cases the routed server agreed with the reference on 91.8% of questions, but 33 of 46
-requests handed at least one question on, so the median case took 0.545 s. **If time per
-case matters most, serve Flash alone.**
+The unpadded split is scored by task macro and the padded levels by accuracy (50 questions
+per task, so the two coincide). **The routed service matches Bobcat 1.1 alone at 8K, 16K
+and 30K**: every padded question goes to Bobcat 1.1, so the answers are the same. On the
+unpadded split, routed minus Bobcat 1.1 alone is -0.39 points [-0.81, +0.00], and the length
+rule moves no question there (every question over 2,048 tokens already had more than 64
+candidates). No request failed, and the two engines ran every block on the 96 GB GPU without
+running out of memory; concurrent load has not been tested.
 
-These routing figures were measured with the first Bobcat 1.1 candidate (temperature
-1.1885) as the 27B model, in an NVFP4 build (`--big-quantization none` on a checkpoint made
-with `scripts/nvfp4_quantize.py`). They have not been re-measured with the released Bobcat
-1.1 adapter or with an FP8 27B engine, and concurrent load on the two engines has not been
-tested.
+**The price of the rule is Flash's share on long workflows.** 71.5% of the questions in
+TypeSafe's 20 workflow cases are longer than 2,048 Flash tokens (median 5,268), so the routed
+server answers only 21.5% of them with Flash. It agreed with the reference on **91.8%** of the
+329 questions (workflow mean 88.2%, Jev 86.5%) at a median **0.48 s per case**, against
+91.5% and 0.53 s for routing without the length rule in the same session: long questions
+skip the Flash pass. **Where time per case matters most, serve Flash alone** (0.25 s per case
+client-side, see [Latency](#latency)) and keep long states off it.
 
 ## Running on AWS
 
@@ -313,6 +335,28 @@ evaluation-only; none of their rows was used for training, selection or calibrat
 
 Both rows ran on the same served setup. On its evaluation path Bobcat 1.1 scores 7.8%.
 
+### Long inputs
+
+The 300 development questions of Bobcat 1.1's long-input test (50 per task), with the state
+padded by unrelated passages to a length counted in Flash tokens; served FP8 path:
+
+| State length | Flash 1.1 | Change [95%] | Gemma 4 26B-A4B zero-shot, change | Bobcat 1.1, change |
+|---|---:|---|---:|---:|
+| Unpadded | 92.0% | - | (85.7%) | (93.7%) |
+| 8K tokens | 86.7% | -5.3 [-9.1, -1.8] | -7.0 | 0.0 |
+| 16K tokens | 85.3% | -6.7 [-11.9, -1.9] | -6.7 | -2.7 |
+| 30K tokens | 84.7% | **-7.3 [-12.6, -2.8]** | -7.3 | -1.7 |
+
+Most of the drop is in tool-call review (92% to 70% at 30K) and classification (74% to 58%).
+BF16 weights lose as much (-7.7 at 30K), so FP8 is not the cause, and the untrained base
+loses the same 7.3 points; Flash's training corpus had no padded long rows. Bobcat 1.1's
+column is from its own evaluation path. **The routed server sends every question longer
+than 2,048 Flash tokens to Bobcat 1.1** and then matches it at 8K, 16K and 30K (see
+[Routing](#routing-to-bobcat-11)). With `--max-model-len 32832` Flash accepts up to 32,768
+Flash tokens per compiled question (one 32,704-token request took 1.90 s); Gemma's tokenizer
+counts about 8% more tokens than Bobcat's on these rows, and longer requests are refused,
+never truncated.
+
 ### Latency
 
 | One RTX PRO 6000 Blackwell 96 GB, vLLM 0.30.0, FP8, engine (no HTTP) | Flash 1.1 |
@@ -324,8 +368,27 @@ Both rows ran on the same served setup. On its evaluation path Bobcat 1.1 scores
 | TypeSafe workflow case, served over localhost HTTP: median / mean / Invoice median | 0.297 / 0.62 / 1.50 s |
 
 The same architecture with an earlier Flash checkpoint took 15.9 ms (first profile) and
-0.185 s per workflow case on one H200, and 13.7 ms and 0.226 s on one B200. Latency under
-concurrent HTTP load has not been measured.
+0.185 s per workflow case on one H200, and 13.7 ms and 0.226 s on one B200.
+
+**Client-side.** A separate client host over HTTPS, one reused connection, one request at a
+time, to `bobcat.flash_server` (FP8, `--schedule all`) behind a TLS proxy on one RTX PRO
+6000; no request failed:
+
+| p50 | Same datacenter | Another region (51 ms TCP round trip) |
+|---|---:|---:|
+| One decision (512 tokens, 8 candidates) | 27.3 ms | 77.7 ms |
+| 3 questions on one state | 28.1 ms | 78.5 ms |
+| 21 questions on one state | 57.3 ms | 103.4 ms |
+| TypeSafe workflow case, median: cold server / repeated pass | **0.25** / 0.10 s | **0.42** / 0.23 s |
+| Invoice workflow case, median, cold server | 1.50 s | 1.71 s |
+
+In the same datacenter the network adds about 1 ms per request; from another region each
+request adds one round trip. "Cold" is the first pass after the server starts, with an empty
+prefix cache; the repeated pass resends the same 46 requests, so most of each prompt comes
+from the cache and that figure is an upper bound on the cache's gain. TypeSafe does not say
+where or with what cache state it measured Jev's 0.42 s, so this is not a like-for-like
+comparison, and the question-heavy Invoice cases stay slower than Jev's published 0.45 s.
+Latency under concurrent HTTP load has not been measured.
 
 ### Serving precision
 
@@ -402,9 +465,23 @@ development and 89.1% against 91.2% on TypeSafe's workflows. Serve FP8.
   threshold to Bobcat 1.1, as `bobcat.route_server` does.
 - Insufficient evidence is as hard for Flash as for Bobcat (WANLI256 0.734). Give it an
   explicit "not stated" option.
-- The routing figures use the first Bobcat 1.1 candidate as the 27B model (see
-  [Routing](#routing-to-bobcat-11)). Two engines on one GPU left little memory headroom in
-  our NVFP4 test, and out-of-range inputs in other scripts were never probed.
+- **Long states.** On its own, Flash loses 7.3 points at a 30K-token state and 5.3 already
+  at 8K (see [Long inputs](#long-inputs)). Serve long inputs through the routed server,
+  whose length rule sends them to Bobcat 1.1, or through Bobcat 1.1 directly. With the rule,
+  long workflows are answered mostly by Bobcat 1.1 (78.5% of TypeSafe's questions), at its
+  speed.
+- **Two long-context continuations failed and were not released.** We continued this
+  adapter on 2,400 padded rows (4K-30K tokens) plus replay, distilled from the released
+  Bobcat 1.1, under four conditions written down before training: 30K change of at least
+  -2.0 points on the served path, development macro of at least 91.77%, TypeSafe agreement
+  of at least 90.19%, injection success of at most 10%. The first arm (learning rate 5e-5)
+  lost 4.7 points at 30K [-9.7, -0.4], and fell to 91.44% on development and 89.97% on
+  TypeSafe (injection 7.5%). The second (2e-5, twice the replay) kept 92.20%, 91.19% and
+  7.7% but still lost 4.3 points at 30K [-9.6, +0.4]. Neither met all four, so Flash 1.1 is
+  unchanged; the drop on tool-call review, which was never trained, did not shrink in either.
+- The routed server's two engines share one GPU; they ran every measurement without running
+  out of memory, but concurrent load has not been tested, and out-of-range inputs in other
+  scripts were never probed.
 - The development split and the sealed final are Korean; English results come from
   TypeSafe's 20 cases, SemIf and training monitors. The final has no classification or
   tool-call rows.

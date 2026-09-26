@@ -14,6 +14,14 @@ cluster bootstrap against the unpadded level.
         --levels 8192,16384,30720,61440 --count 300 --out longctx
     python scripts/long_context_eval.py report --dev-rows dev.jsonl \
         --logits longctx-logits --out long-context-report.json
+
+`build --write-rows` also writes each level's padded dev rows (the dev row with its padded
+state; `long_context_level` added), so another model can compile the identical request text
+(`compile`) and an HTTP client can send it. `--exclude-ids` (a manifest's `ids` or a JSON
+list) draws a sample disjoint from an earlier one. Neither option changes the compiled rows.
+
+    python scripts/long_context_eval.py compile --rows-dir longctx --compiler-model other \
+        --out longctx-other
 """
 
 from __future__ import annotations
@@ -26,7 +34,7 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-from bobcat.schema import json_hash
+from bobcat.schema import file_hash, json_hash
 
 SALT = "bobcat-long-context-v1"
 PAD_KEYS = ("기타 자료 1", "기타 자료 2")
@@ -135,11 +143,14 @@ def build(args) -> None:
     compiler = StudentCompiler(args.compiler_model, receipt["files"], identifiers,
                                max_branch_tokens=2 * max(levels) + 64, piecewise=True)
     rows = [json.loads(line) for line in args.dev_rows.open()]
-    chosen = stratified(rows, args.count, args.salt)
+    excluded = set(excluded_ids(args.exclude_ids)) if args.exclude_ids else set()
+    chosen = stratified([r for r in rows if r["id"] not in excluded], args.count, args.salt)
     pool = passage_pool(rows, args.salt)
     args.out.mkdir(parents=True, exist_ok=False)
     sinks = {level: (args.out / f"level-{level}.compiled.jsonl").open("w")
              for level in [0, *levels]}
+    row_sinks = ({level: (args.out / f"level-{level}.rows.jsonl").open("w")
+                  for level in [0, *levels]} if args.write_rows else {})
     achieved = defaultdict(list)
     for row in chosen:
         state, (question,) = parse_request(row["request"])
@@ -159,16 +170,78 @@ def build(args) -> None:
             achieved[level].append(len(sequence))
             sinks[level].write(json.dumps({"id": row["id"], "level": level, "task": row["task"],
                                            "input_ids": sequence, "option_ids": options}) + "\n")
-    for sink in sinks.values():
+            if level in row_sinks:
+                row_sinks[level].write(json.dumps(padded_row(row, padded, level),
+                                                  ensure_ascii=False) + "\n")
+    for sink in [*sinks.values(), *row_sinks.values()]:
         sink.close()
     manifest = {"schema": "bobcat-long-context-v1", "salt": args.salt, "count": len(chosen),
                 "ids": [r["id"] for r in chosen], "pool_passages": len(pool),
                 "pool_tasks": list(POOL_TASKS), "pad_keys": list(PAD_KEYS),
                 "levels": {str(k): {"min": min(v), "median": statistics.median(v),
                                     "max": max(v)} for k, v in achieved.items()}}
+    if excluded:
+        manifest["excluded_ids"] = len(excluded)
+    if row_sinks:
+        manifest["rows_files"] = {str(k): file_hash(args.out / f"level-{k}.rows.jsonl")
+                                  for k in row_sinks}
     (args.out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False,
                                                        indent=1) + "\n")
     print(json.dumps(manifest["levels"]))
+
+
+def excluded_ids(path: Path) -> list[str]:
+    value = json.loads(path.read_text())
+    return value["ids"] if isinstance(value, dict) else value
+
+
+def padded_row(row: dict, state, level: int) -> dict:
+    """The dev row with the padded state: same ID, question, candidates and target."""
+    return {**row, "request": {**row["request"], "state": state}, "long_context_level": level}
+
+
+def compile_rows(args) -> None:
+    """Compile every level-*.rows.jsonl of a build with another model's compiler, so that
+    model scores the identical request text (vllm_bench --workloads longctx reads the out)."""
+    from tokenizers import Tokenizer
+
+    from bobcat.protocol import RequestLimitError, parse_request
+    from bobcat.student_readout import StudentCompiler, identifier_scheme
+
+    receipt = json.loads((args.compiler_model / "bobcat-download.json").read_text())
+    tokenizer_path = args.compiler_model / "tokenizer.json"
+    reserved = {t["id"] for t in json.loads(tokenizer_path.read_text()).get("added_tokens", [])}
+    identifiers = identifier_scheme(Tokenizer.from_file(str(tokenizer_path)), reserved,
+                                    json.loads(args.identifiers.read_text())["identifiers"])
+    compiler = StudentCompiler(args.compiler_model, receipt["files"], identifiers,
+                               max_branch_tokens=args.max_tokens, piecewise=True)
+    args.out.mkdir(parents=True, exist_ok=False)
+    summary = {}
+    for path in sorted(args.rows_dir.glob("level-*.rows.jsonl")):
+        name = path.name.replace(".rows.jsonl", "")
+        lengths, refused = [], []
+        with (args.out / f"{name}.compiled.jsonl").open("w") as sink:
+            for line in path.open():
+                row = json.loads(line)
+                state, (question,) = parse_request(row["request"])
+                try:
+                    sequence, options = compiler.compile(state, question)
+                except RequestLimitError:
+                    refused.append(row["id"])  # never truncated; reported
+                    continue
+                lengths.append(len(sequence))
+                sink.write(json.dumps({"id": row["id"], "level": row.get("long_context_level", 0),
+                                       "task": row["task"], "input_ids": sequence,
+                                       "option_ids": options}) + "\n")
+        summary[name] = {"rows": len(lengths), "refused": refused,
+                         "tokens": {"min": min(lengths), "median": statistics.median(lengths),
+                                    "max": max(lengths)} if lengths else None,
+                         "rows_sha256": file_hash(path)}
+    (args.out / "manifest.json").write_text(json.dumps(
+        {"schema": "bobcat-long-context-compile-v1", "compiler": receipt["repo"],
+         "revision": receipt["revision"], "max_tokens": args.max_tokens, "levels": summary},
+        indent=1) + "\n")
+    print(json.dumps({k: (v["rows"], len(v["refused"])) for k, v in summary.items()}))
 
 
 def softmax(values, temperature):
@@ -249,14 +322,25 @@ def main():
     b.add_argument("--levels", default="8192,16384,30720,61440")
     b.add_argument("--count", type=int, default=300)
     b.add_argument("--salt", default=SALT)
+    b.add_argument("--exclude-ids", type=Path,
+                   help="a build manifest (its `ids`) or a JSON list of dev IDs to leave out")
+    b.add_argument("--write-rows", action="store_true",
+                   help="also write level-*.rows.jsonl (padded dev rows)")
     b.add_argument("--out", type=Path, required=True)
+    c = sub.add_parser("compile")
+    c.add_argument("--rows-dir", type=Path, required=True)
+    c.add_argument("--compiler-model", type=Path, required=True)
+    c.add_argument("--identifiers", type=Path,
+                   default=Path("reports/2026-09-22-glm-readout-preflight.json"))
+    c.add_argument("--max-tokens", type=int, default=32768)
+    c.add_argument("--out", type=Path, required=True)
     r = sub.add_parser("report")
     r.add_argument("--dev-rows", type=Path, required=True)
     r.add_argument("--logits", type=Path, required=True)
     r.add_argument("--temperature", type=float, default=1.1489)
     r.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    build(args) if args.command == "build" else report(args)
+    {"build": build, "compile": compile_rows, "report": report}[args.command](args)
 
 
 if __name__ == "__main__":

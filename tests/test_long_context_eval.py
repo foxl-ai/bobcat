@@ -67,3 +67,89 @@ def test_report_accuracy_and_bootstrap(tmp_path):
     assert sum(c for c, _ in table[8192].values()) == 4
     low, high = lc.paired_bootstrap(dev, table[0], table[8192], draws=500)
     assert low <= -2 / 6 <= high <= 0
+
+
+def compiler_dir(tmp_path, monkeypatch):
+    """A char-level pinned compiler folder (tests/test_api_server.char_student) with a
+    download receipt, and a three-identifier scheme so the toy vocabulary suffices."""
+    from test_api_server import char_student
+
+    from bobcat import student_readout
+    from bobcat.schema import file_hash
+
+    folder = tmp_path / "compiler"
+    char_student(folder)
+    pinned = {name: {"status": "ok", "bytes": (folder / name).stat().st_size,
+                     "sha256": file_hash(folder / name)}
+              for name in ("tokenizer.json", "tokenizer_config.json")}
+    (folder / "bobcat-download.json").write_text(json.dumps(
+        {"repo": "toy/char", "revision": "0" * 40, "files": pinned}))
+    monkeypatch.setattr(student_readout, "identifier_scheme", lambda *a, **k: ["A", "B", "C"])
+    return folder
+
+
+def dev_rows(tmp_path):
+    data = []
+    for i in range(12):
+        task = ["product_search", "product_citation", "product_routing"][i % 3]
+        data.append({"id": f"r{i}", "task": task, "group_id": f"g{i % 5}", "split": "dev",
+                     "candidate_ids": ["no", "yes"], "target": "yes",
+                     "request": {"model": "bobcat-latest",
+                                 "state": {"doc": f"passage {i} " + "k" * 250},
+                                 "questions": {"q": {"type": "noul",
+                                                     "instructions": f"question {i}?"}}}})
+    path = tmp_path / "dev.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in data))
+    return path, data
+
+
+def build_args(dev, compiler, out, **extra):
+    import argparse
+    from pathlib import Path
+
+    values = {"dev_rows": dev, "compiler_model": compiler, "levels": "600,900",
+              "identifiers": Path("reports/2026-09-22-glm-readout-preflight.json"), "count": 6,
+              "salt": lc.SALT, "out": out, "exclude_ids": None, "write_rows": False}
+    return argparse.Namespace(**{**values, **extra})
+
+
+def test_written_rows_recompile_to_the_same_sequences_and_change_nothing(tmp_path, monkeypatch):
+    import argparse
+
+    compiler = compiler_dir(tmp_path, monkeypatch)
+    dev, data = dev_rows(tmp_path)
+    lc.build(build_args(dev, compiler, tmp_path / "plain"))
+    lc.build(build_args(dev, compiler, tmp_path / "rows", write_rows=True))
+    for level in (0, 600, 900):
+        name = f"level-{level}.compiled.jsonl"
+        assert (tmp_path / "plain" / name).read_bytes() == (tmp_path / "rows" / name).read_bytes()
+        padded = [json.loads(line) for line in (tmp_path / "rows" / f"level-{level}.rows.jsonl")
+                  .open()]
+        originals = {r["id"]: r for r in data}
+        for row in padded:
+            original = originals[row["id"]]
+            assert row["long_context_level"] == level
+            assert {k: row[k] for k in ("task", "target", "candidate_ids", "group_id")} == \
+                {k: original[k] for k in ("task", "target", "candidate_ids", "group_id")}
+            assert row["request"]["questions"] == original["request"]["questions"]
+            assert level or row["request"]["state"] == original["request"]["state"]
+    lc.compile_rows(argparse.Namespace(
+        rows_dir=tmp_path / "rows", compiler_model=compiler, max_tokens=5000, out=tmp_path / "re",
+        identifiers=build_args(dev, compiler, None).identifiers))
+    for level in (0, 600, 900):
+        name = f"level-{level}.compiled.jsonl"
+        assert (tmp_path / "re" / name).read_text() == (tmp_path / "rows" / name).read_text()
+    manifest = json.loads((tmp_path / "re" / "manifest.json").read_text())
+    assert all(not v["refused"] for v in manifest["levels"].values())
+
+
+def test_an_excluded_sample_is_disjoint(tmp_path, monkeypatch):
+    compiler = compiler_dir(tmp_path, monkeypatch)
+    dev, _ = dev_rows(tmp_path)
+    lc.build(build_args(dev, compiler, tmp_path / "first"))
+    first = json.loads((tmp_path / "first" / "manifest.json").read_text())
+    lc.build(build_args(dev, compiler, tmp_path / "second",
+                        exclude_ids=tmp_path / "first" / "manifest.json"))
+    second = json.loads((tmp_path / "second" / "manifest.json").read_text())
+    assert second["excluded_ids"] == 6 and len(second["ids"]) == 6
+    assert not set(first["ids"]) & set(second["ids"])

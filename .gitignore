@@ -79,6 +79,8 @@ scripts/*
 !scripts/semif_bench.py
 !scripts/serve_eval.py
 !scripts/state_cache_check.py
+!scripts/add_serving_artifact.py
+!scripts/length_route_select.py
 tests/test_aws_budget.py
 tests/test_checkpoint_gpu_profile.py
 tests/test_finish_gpu_boot.py

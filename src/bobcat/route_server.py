@@ -6,7 +6,12 @@ its own, from its own input and its own Flash scores only:
   1. out of range (decided from input features before any forward pass): more candidates
      than Flash's range (64), or letters that are mostly neither Hangul nor Latin (Flash was
      trained and evaluated on Korean and English only) -> Bobcat, sent at once, beside Flash;
-  2. otherwise Flash scores it; when its calibrated top probability (softmax at Flash's
+  2. too long (also before any pass): the question's Flash-compiled sequence (its state and
+     itself, in Flash tokens) is longer than `max_flash_tokens` -> Bobcat, sent at once.
+     Flash loses accuracy as irrelevant text fills the state (-3 pt already at 1K of padding,
+     -6.3 pt at 8K on dev) where Bobcat 1.1 keeps it; the default (2048) was chosen on dev
+     only (reports/2026-09-26-bobcat-flash-longctx-fix.md);
+  3. otherwise Flash scores it; when its calibrated top probability (softmax at Flash's
      calibration temperature) is below the threshold (0.8, chosen on the calibration split;
      see the Bobcat Flash 1.1 model card) -> Bobcat scores it again, from its own compile.
 The answer carries the probabilities of the model that scored it at that model's calibration
@@ -16,13 +21,14 @@ depend on the other questions of the request (tests/test_route_server.py).
 Both engines live in this process on one GPU (vLLM, each with its own share of GPU memory).
 Headers: `x-bobcat-route` lists, in question order, `flash` or `bobcat` (the model whose
 scores answer it); `x-bobcat-route-reasons` gives `in_range`, `low_confidence`, `candidates`,
-`script` or `bobcat_limit` (Bobcat could not compile it; Flash's answer stands). With
+`script`, `length` or `bobcat_limit` (Bobcat could not compile it; Flash's answer stands). With
 `--allow-route-override` (measurement only), `x-bobcat-route-mode: flash|bobcat` forces one
 model for a request.
 
     python -m bobcat.route_server --flash-model fnvfp4/ --flash-compiler-model fbase/ \
         --flash-temperature 0.8912 --big-model b11-nvfp4/ --big-compiler-model b11-compiler/ \
         --big-temperature 1.2008 --schedule all --engine-arg max_num_batched_tokens=16384
+    (length rule: --max-flash-tokens, default 2048; 0 turns it off)
 """
 
 from __future__ import annotations
@@ -39,6 +45,10 @@ from bobcat.protocol import RequestLimitError
 
 THRESHOLD = 0.8
 MAX_CANDIDATES = 64
+# Chosen on dev only by the pre-registered rule (.aws-local/flashlc-20260926-preregistration.json):
+# the largest threshold keeping routed accuracy within 1 pt of Bobcat 1.1 alone at every padded
+# level (0-8K) and on the full dev split. `--max-flash-tokens 0` turns the length rule off.
+MAX_FLASH_TOKENS = 2048
 MIN_KNOWN_SCRIPT_SHARE = 0.5
 MODES = ("auto", "flash", "bobcat")
 
@@ -81,13 +91,18 @@ class RoutePolicy:
     threshold: float = THRESHOLD
     max_candidates: int = MAX_CANDIDATES
     min_known_script_share: float = MIN_KNOWN_SCRIPT_SHARE
+    max_flash_tokens: int | None = MAX_FLASH_TOKENS
 
-    def out_of_range(self, state, question) -> str | None:
-        """The reason a question goes straight to Bobcat, or None (known before any pass)."""
+    def out_of_range(self, state, question, flash_tokens: int | None = None) -> str | None:
+        """The reason a question goes straight to Bobcat, or None (known before any pass).
+        `flash_tokens` is the length of the question's own Flash-compiled sequence."""
         if len(question.labels) > self.max_candidates:
             return "candidates"
         if known_script_share(state, question) < self.min_known_script_share:
             return "script"
+        if (self.max_flash_tokens is not None and flash_tokens is not None
+                and flash_tokens > self.max_flash_tokens):
+            return "length"
         return None
 
 
@@ -115,9 +130,11 @@ class RoutedEngine:
                  allow_override: bool = False):
         self.flash, self.big, self.policy = flash, big, policy or RoutePolicy()
         self.allow_override = allow_override
+        length = ("" if self.policy.max_flash_tokens is None
+                  else f"; length > {self.policy.max_flash_tokens}")
         self.name = (f"route (flash: {getattr(flash.engine, 'name', flash.name)}; "
                      f"{big.name}: {getattr(big.engine, 'name', big.name)}; "
-                     f"confidence < {self.policy.threshold})")
+                     f"confidence < {self.policy.threshold}{length})")
 
     def mode(self, headers) -> str:
         if not self.allow_override or headers is None:
@@ -150,7 +167,7 @@ class RoutedEngine:
         direct, on_flash = [], []
         for index, question in enumerate(questions):
             reason = (None if mode == "flash" else "forced" if mode == "bobcat"
-                      else self.policy.out_of_range(state, question))
+                      else self.policy.out_of_range(state, question, len(sequences[index])))
             if reason is not None and compile_big(index):
                 direct.append(index)
                 reasons[index] = reason
@@ -163,7 +180,7 @@ class RoutedEngine:
             return await self._score(self.big, [big_compiled[i][0] for i in indices],
                                      [big_compiled[i][1] for i in indices])
 
-        # Out-of-range questions start on Bobcat at once, beside the Flash pass.
+        # Out-of-range and too-long questions start on Bobcat at once, beside the Flash pass.
         direct_task = asyncio.ensure_future(big(direct)) if direct else None
         second = []
         try:
@@ -223,6 +240,9 @@ def main():
     parser.add_argument("--threshold", type=float, default=THRESHOLD)
     parser.add_argument("--max-candidates", type=int, default=MAX_CANDIDATES)
     parser.add_argument("--min-known-script-share", type=float, default=MIN_KNOWN_SCRIPT_SHARE)
+    parser.add_argument("--max-flash-tokens", type=int, default=MAX_FLASH_TOKENS,
+                        help="questions whose Flash-compiled sequence is longer go to Bobcat "
+                             "before any pass (0 turns the length rule off)")
     parser.add_argument("--name", default="bobcat-flash-1.1")
     parser.add_argument("--release-date", default="2026-09-26")
     parser.add_argument("--identifiers", type=Path,
@@ -259,7 +279,10 @@ def main():
             schedule=args.schedule)
         tiers[tier] = Tier("flash" if tier == "flash" else args.big_name, engine, compiler,
                            getattr(args, f"{tier}_temperature"))
-    policy = RoutePolicy(args.threshold, args.max_candidates, args.min_known_script_share)
+    if args.max_flash_tokens is not None and args.max_flash_tokens < 0:
+        raise SystemExit("--max-flash-tokens is a token count.")
+    policy = RoutePolicy(args.threshold, args.max_candidates, args.min_known_script_share,
+                         args.max_flash_tokens or None)
     routed = RoutedEngine(tiers["flash"], tiers["big"], policy,
                           allow_override=args.allow_route_override)
     description = ("Bobcat typed decision model (Choice/Noul/Score): Bobcat Flash answers, "

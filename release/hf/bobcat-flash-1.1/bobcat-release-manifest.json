@@ -885,10 +885,510 @@
           "task_macro": 0.9336448857766246
         }
       }
+    },
+    "routing_length_rule": {
+      "added_at": "2026-09-26T16:02:55Z",
+      "note": "Additive routing rule for the frozen adapter above; the adapter, base revision, tokenizer and every frozen field are unchanged (sha256 of this manifest without serving_artifacts: 88056ce0..., as bound by the final-opening record). All figures are development measurements (product eval v2 dev, TypeSafe 20) on one RTX PRO 6000; no sealed final was opened; Jev was not called.",
+      "server": "bobcat.route_server --max-flash-tokens 2048 (the default; 0 turns the rule off)",
+      "server_source_sha256": "85d4377e4825a46e470fa054bfd81f53ed439b9e3518c378bd6ef5e2cf07f24e",
+      "rule": {
+        "max_flash_tokens": 2048,
+        "length": "the question's Flash-compiled sequence (its state and itself, Flash tokens) longer than 2048 -> Bobcat 1.1 before any pass, beside the out-of-range rules",
+        "order": [
+          "more than 64 candidates -> Bobcat",
+          "fewer than 50% of letters Hangul or ASCII Latin -> Bobcat",
+          "Flash-compiled length > 2048 -> Bobcat",
+          "Flash calibrated top probability < 0.8 -> Bobcat",
+          "otherwise Flash"
+        ],
+        "fallback": {
+          "model": "bobcat-1.1 (r16semif)",
+          "build": "NVFP4 model.safetensors 2ea6716e36673bc73995bc5e06bd3a032ed8be19f4fff8dd544ce9a40bb173c9",
+          "temperature": 1.200767737961694
+        },
+        "flash_build": "FP8 (online) of the merged frozen adapter, temperature 0.8911980656311957"
+      },
+      "selection": {
+        "preregistration": {
+          "file": "an internal file",
+          "sha256": "6b98d40343a0829804fbb72d85c0ce3a464e805e01045387e4961386ea45ed64",
+          "s3_last_modified": "2026-09-26T13:39:34Z"
+        },
+        "data": "DEV only: the canonical 300 long-context dev questions (salt bobcat-long-context-v1) padded to Flash-token levels 0/1024/2048/3072/4096/6144/8192, plus the full dev split unpadded (3,188)",
+        "scores": "engine-level logits of the two served builds (vLLM 0.30.0, max_model_len 32832), the identical padded request text for both",
+        "constraint": "routed quality >= Bobcat 1.1 alone - 1.0 pt at every level (point estimates)",
+        "choice_rule": "largest qualifying T (most questions on Flash)",
+        "candidates": {
+          "1024": {
+            "qualifies": true,
+            "worst_routed_minus_bobcat": -0.0033,
+            "flash_share_full_dev": 0.6917,
+            "flash_share_by_level": {
+              "0": 0.7033,
+              "1024": 0.7033,
+              "2048": 0.0,
+              "3072": 0.0,
+              "4096": 0.0,
+              "6144": 0.0,
+              "8192": 0.0,
+              "dev_full": 0.6917
+            }
+          },
+          "2048": {
+            "qualifies": true,
+            "worst_routed_minus_bobcat": -0.01,
+            "flash_share_full_dev": 0.8413,
+            "flash_share_by_level": {
+              "0": 0.82,
+              "1024": 0.82,
+              "2048": 0.8167,
+              "3072": 0.0,
+              "4096": 0.0,
+              "6144": 0.0,
+              "8192": 0.0,
+              "dev_full": 0.8413
+            }
+          },
+          "3072": {
+            "qualifies": false,
+            "worst_routed_minus_bobcat": -0.02,
+            "flash_share_full_dev": 0.8413,
+            "flash_share_by_level": {
+              "0": 0.82,
+              "1024": 0.82,
+              "2048": 0.8167,
+              "3072": 0.81,
+              "4096": 0.0,
+              "6144": 0.0,
+              "8192": 0.0,
+              "dev_full": 0.8413
+            }
+          },
+          "4096": {
+            "qualifies": false,
+            "worst_routed_minus_bobcat": -0.02,
+            "flash_share_full_dev": 0.8413,
+            "flash_share_by_level": {
+              "0": 0.82,
+              "1024": 0.82,
+              "2048": 0.8167,
+              "3072": 0.81,
+              "4096": 0.8033,
+              "6144": 0.0,
+              "8192": 0.0,
+              "dev_full": 0.8413
+            }
+          },
+          "6144": {
+            "qualifies": false,
+            "worst_routed_minus_bobcat": -0.02,
+            "flash_share_full_dev": 0.8413,
+            "flash_share_by_level": {
+              "0": 0.82,
+              "1024": 0.82,
+              "2048": 0.8167,
+              "3072": 0.81,
+              "4096": 0.8033,
+              "6144": 0.7533,
+              "8192": 0.0,
+              "dev_full": 0.8413
+            }
+          },
+          "8192": {
+            "qualifies": false,
+            "worst_routed_minus_bobcat": -0.03,
+            "flash_share_full_dev": 0.8413,
+            "flash_share_by_level": {
+              "0": 0.82,
+              "1024": 0.82,
+              "2048": 0.8167,
+              "3072": 0.81,
+              "4096": 0.8033,
+              "6144": 0.7533,
+              "8192": 0.7067,
+              "dev_full": 0.8413
+            }
+          },
+          "none": {
+            "qualifies": false,
+            "worst_routed_minus_bobcat": -0.03,
+            "flash_share_full_dev": 0.8413,
+            "flash_share_by_level": {
+              "0": 0.82,
+              "1024": 0.82,
+              "2048": 0.8167,
+              "3072": 0.81,
+              "4096": 0.8033,
+              "6144": 0.7533,
+              "8192": 0.7067,
+              "dev_full": 0.8413
+            }
+          }
+        },
+        "chosen": {
+          "T": 2048,
+          "qualified": true,
+          "qualifying": [
+            1024,
+            2048
+          ]
+        },
+        "chosen_levels": {
+          "canonical:0": {
+            "routed": 0.9367,
+            "bobcat": 0.9367,
+            "flash": 0.9233,
+            "flash_share": 0.82,
+            "routed_minus_bobcat_ci95": [
+              -0.0168,
+              0.0143
+            ]
+          },
+          "canonical:1024": {
+            "routed": 0.9267,
+            "bobcat": 0.93,
+            "flash": 0.8933,
+            "flash_share": 0.82,
+            "routed_minus_bobcat_ci95": [
+              -0.0228,
+              0.0144
+            ]
+          },
+          "canonical:2048": {
+            "routed": 0.9167,
+            "bobcat": 0.9267,
+            "flash": 0.89,
+            "flash_share": 0.8167,
+            "routed_minus_bobcat_ci95": [
+              -0.0325,
+              0.0105
+            ]
+          },
+          "canonical:3072": {
+            "routed": 0.93,
+            "bobcat": 0.93,
+            "flash": 0.8733,
+            "flash_share": 0.0,
+            "routed_minus_bobcat_ci95": [
+              0.0,
+              0.0
+            ]
+          },
+          "canonical:4096": {
+            "routed": 0.9267,
+            "bobcat": 0.9267,
+            "flash": 0.8833,
+            "flash_share": 0.0,
+            "routed_minus_bobcat_ci95": [
+              0.0,
+              0.0
+            ]
+          },
+          "canonical:6144": {
+            "routed": 0.9233,
+            "bobcat": 0.9233,
+            "flash": 0.86,
+            "flash_share": 0.0,
+            "routed_minus_bobcat_ci95": [
+              0.0,
+              0.0
+            ]
+          },
+          "canonical:8192": {
+            "routed": 0.9333,
+            "bobcat": 0.9333,
+            "flash": 0.86,
+            "flash_share": 0.0,
+            "routed_minus_bobcat_ci95": [
+              0.0,
+              0.0
+            ]
+          },
+          "dev_full:0": {
+            "routed": 0.9322,
+            "bobcat": 0.9364,
+            "flash": 0.9202,
+            "flash_share": 0.8413,
+            "routed_minus_bobcat_ci95": [
+              -0.0066,
+              0.0009
+            ]
+          }
+        },
+        "holdout_reported_only": {
+          "qualifies": false,
+          "levels": {
+            "holdout:0": {
+              "routed": 0.9367,
+              "bobcat": 0.95,
+              "flash": 0.91,
+              "flash_share": 0.82
+            },
+            "holdout:1024": {
+              "routed": 0.9233,
+              "bobcat": 0.9367,
+              "flash": 0.8867,
+              "flash_share": 0.81
+            },
+            "holdout:2048": {
+              "routed": 0.92,
+              "bobcat": 0.9233,
+              "flash": 0.8933,
+              "flash_share": 0.8067
+            },
+            "holdout:3072": {
+              "routed": 0.9367,
+              "bobcat": 0.9367,
+              "flash": 0.8867,
+              "flash_share": 0.0
+            },
+            "holdout:4096": {
+              "routed": 0.93,
+              "bobcat": 0.93,
+              "flash": 0.8733,
+              "flash_share": 0.0
+            },
+            "holdout:6144": {
+              "routed": 0.9367,
+              "bobcat": 0.9367,
+              "flash": 0.8633,
+              "flash_share": 0.0
+            },
+            "holdout:8192": {
+              "routed": 0.9233,
+              "bobcat": 0.9233,
+              "flash": 0.8667,
+              "flash_share": 0.0
+            }
+          },
+          "note": "a disjoint 300-question dev sample; at T=2048 it misses the 1 pt margin at the unpadded and 1K levels (-1.33 pt, 4 of 300 questions), where the length rule routes nothing: the gap is the confidence rule's"
+        }
+      },
+      "measured_http_server_host": {
+        "client": "loopback HTTP on the server host, one request per question (server-side, not a separate same-AZ client)",
+        "levels": {
+          "dev0": {
+            "rows": 3188,
+            "auto": {
+              "task_macro": 0.9315,
+              "flash_share": 0.8397,
+              "client_p50_ms": 33.29,
+              "client_p95_ms": 214.04,
+              "failed": 0
+            },
+            "flash": {
+              "task_macro": 0.9216,
+              "flash_share": 1.0,
+              "client_p50_ms": 32.15,
+              "client_p95_ms": 89.84,
+              "failed": 0
+            },
+            "bobcat": {
+              "task_macro": 0.9354,
+              "flash_share": 0.0,
+              "client_p50_ms": 60.5,
+              "client_p95_ms": 213.84,
+              "failed": 0
+            },
+            "auto_without_length_rule_recomputed": {
+              "task_macro": 0.9315,
+              "flash_share": 0.8397
+            },
+            "auto_minus_bobcat_macro": [
+              -0.0039,
+              [
+                -0.0081,
+                0.0
+              ]
+            ],
+            "auto_minus_flash_macro": [
+              0.0099,
+              [
+                0.0036,
+                0.0166
+              ]
+            ]
+          },
+          "lc8192": {
+            "rows": 300,
+            "auto": {
+              "task_macro": 0.92,
+              "flash_share": 0.0,
+              "client_p50_ms": 452.46,
+              "client_p95_ms": 500.36,
+              "failed": 0
+            },
+            "flash": {
+              "task_macro": 0.86,
+              "flash_share": 1.0,
+              "client_p50_ms": 275.6,
+              "client_p95_ms": 297.98,
+              "failed": 0
+            },
+            "bobcat": {
+              "task_macro": 0.92,
+              "flash_share": 0.0,
+              "client_p50_ms": 435.82,
+              "client_p95_ms": 491.15,
+              "failed": 0
+            },
+            "auto_without_length_rule_recomputed": {
+              "task_macro": 0.8933,
+              "flash_share": 0.7167
+            },
+            "auto_minus_bobcat_macro": [
+              0.0,
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "auto_minus_flash_macro": [
+              0.06,
+              [
+                0.0177,
+                0.1029
+              ]
+            ]
+          },
+          "lc16384": {
+            "rows": 300,
+            "auto": {
+              "task_macro": 0.9133,
+              "flash_share": 0.0,
+              "client_p50_ms": 952.31,
+              "client_p95_ms": 1021.5,
+              "failed": 0
+            },
+            "flash": {
+              "task_macro": 0.8433,
+              "flash_share": 1.0,
+              "client_p50_ms": 702.81,
+              "client_p95_ms": 724.69,
+              "failed": 0
+            },
+            "bobcat": {
+              "task_macro": 0.9133,
+              "flash_share": 0.0,
+              "client_p50_ms": 950.76,
+              "client_p95_ms": 1023.18,
+              "failed": 0
+            },
+            "auto_without_length_rule_recomputed": {
+              "task_macro": 0.8933,
+              "flash_share": 0.6867
+            },
+            "auto_minus_bobcat_macro": [
+              0.0,
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "auto_minus_flash_macro": [
+              0.07,
+              [
+                0.027,
+                0.1132
+              ]
+            ]
+          },
+          "lc30720": {
+            "rows": 300,
+            "auto": {
+              "task_macro": 0.9267,
+              "flash_share": 0.0,
+              "client_p50_ms": 1990.31,
+              "client_p95_ms": 2031.79,
+              "failed": 0
+            },
+            "flash": {
+              "task_macro": 0.8367,
+              "flash_share": 1.0,
+              "client_p50_ms": 1801.22,
+              "client_p95_ms": 1818.0,
+              "failed": 0
+            },
+            "bobcat": {
+              "task_macro": 0.9267,
+              "flash_share": 0.0,
+              "client_p50_ms": 1981.81,
+              "client_p95_ms": 2027.23,
+              "failed": 0
+            },
+            "auto_without_length_rule_recomputed": {
+              "task_macro": 0.8967,
+              "flash_share": 0.67
+            },
+            "auto_minus_bobcat_macro": [
+              0.0,
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "auto_minus_flash_macro": [
+              0.09,
+              [
+                0.0396,
+                0.1368
+              ]
+            ]
+          }
+        }
+      },
+      "typesafe20": {
+        "with_length_rule": {
+          "agreement_common": 0.9179,
+          "workflow_macro": 0.8822,
+          "jev_published_agreement": 0.9088,
+          "requests": {
+            "count": 46,
+            "failed": 0,
+            "retried": 0
+          },
+          "median_case_seconds": 0.4815,
+          "mean_case_seconds": 1.1015,
+          "questions": 418,
+          "flash_share": 0.2153,
+          "requests_with_fallback": 36,
+          "median_case_seconds_by_workflow": {
+            "agent_trace_observability": 0.5006,
+            "customer_service": 0.3192,
+            "invoice_processing": 2.457,
+            "security_incidents": 0.3805
+          }
+        },
+        "without_length_rule_same_session": {
+          "agreement_common": 0.9149,
+          "workflow_macro": 0.8726,
+          "jev_published_agreement": 0.9088,
+          "requests": {
+            "count": 46,
+            "failed": 0,
+            "retried": 0
+          },
+          "median_case_seconds": 0.5297,
+          "mean_case_seconds": 1.0413,
+          "questions": 418,
+          "flash_share": 0.8278,
+          "requests_with_fallback": 32,
+          "median_case_seconds_by_workflow": {
+            "agent_trace_observability": 0.5321,
+            "customer_service": 0.3106,
+            "invoice_processing": 2.7092,
+            "security_incidents": 0.5274
+          }
+        },
+        "question_lengths_flash_tokens": "418 questions: median 5,268, max 11,094; 71.5% longer than 2048 (invoice 100%, security 92%, agent trace 64%, customer service 0%)"
+      },
+      "trade_off": "the rule sends every question longer than 2048 Flash tokens to Bobcat 1.1: on TypeSafe 20 Flash answers 21.5% of the questions (82.8% without the rule), so long-state workflows run at Bobcat cost; short dev traffic is unchanged (Flash 84.0%).",
+      "status": "recommended routing rule for the Flash -> Bobcat 1.1 route server (quality tier); Flash alone is unchanged",
+      "server_source_note": "sha256 of the shipped route_server.py (default --max-flash-tokens 2048). The measurements ran an earlier revision of the same change whose default was off, started with --max-flash-tokens 2048; the rule code was the same."
     }
   },
   "public_copy": {
-    "derived_from_sha256": "ca9a9be3d5262ddd94220287cc414bdcb89d5c50ab6a8ff6fedaa37344b1f047",
+    "derived_from_sha256": "6c67527ee300ef6cc9a42256323f8f9d9a3ffe1edffda1ed3b692f596afedafb",
     "changes": "storage locations, cost figures, host and instance details, and internal report and orchestration paths removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
   }
 }

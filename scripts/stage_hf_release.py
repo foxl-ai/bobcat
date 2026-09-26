@@ -79,7 +79,8 @@ DROP_KEYS = {"s3", "cost", "cost_estimate", "git_head", "gpu_memory_nvidia_smi",
 DROP_KEY_PREFIXES = ("usd", "infra/")
 REWRITES = (
     (re.compile(r"infra/\w+/nvfp4_quantize\.py"), "scripts/nvfp4_quantize.py"),
-    (re.compile(r"\s*\((?:g7e|g6e|p5|p5en|p6-b200|p6-b300)\.[0-9a-z]+\)"), ""),
+    (re.compile(r"\s*\((?:g7e|g6e|p5|p5e|p5en|p6-b200|p6-b300)\.[0-9a-z]+\)"), ""),
+    (re.compile(r"\.aws-local/[\w.-]+(?: \(internal\))?"), "an internal file"),
 )
 # Named so a hit can be reported without echoing the text around it.
 BLOCKED = {
