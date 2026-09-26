@@ -149,6 +149,7 @@ def run(requests: Path, url: str, out: Path) -> None:
                 "status": status, "attempts": attempts, "client_ms": round(ms, 1),
                 "engine_ms": float(headers.get("x-bobcat-engine-ms", "nan")),
                 "processed_tokens": int(headers.get("x-bobcat-processed-tokens", 0)),
+                "route": headers.get("x-bobcat-route"),  # bobcat.route_server only
                 "usage": payload.get("usage"), "answers": payload.get("answers", {}),
             }) + "\n")
             print(row["workflow"], row["case"], row["step"], status, f"{ms:.0f} ms",

@@ -1,0 +1,894 @@
+{
+  "schema": "bobcat-release-manifest-v1",
+  "name": "bobcat-flash-1.1",
+  "model_id": "bobcat-flash-1.1",
+  "status": "frozen",
+  "frozen_at": "2026-09-26T08:29:39.258509+00:00",
+  "scope": "Fast Bobcat tier (typed decisions: Choice/Noul/Score). Additional tier; it replaces no released model, so no sealed final was opened.",
+  "base": {
+    "repo": "google/gemma-4-26B-A4B-it",
+    "revision": "4d7ae4984b7db7de8f8457170b3f1a419ee76d52",
+    "license": "Apache-2.0",
+    "architecture_note": "Gemma 4 26B-A4B: 30 layers, sliding-window (1024) + global attention, 128 experts top-8 plus a dense MLP, about 4B active parameters"
+  },
+  "tokenizer": {
+    "tokenizer.json": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+    "tokenizer_config.json": "9f4fec4b1dc6ecddf8f4a92e9caea5971c0e67d81309f3f9066a2bee8c362633",
+    "chat_template.jinja": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4"
+  },
+  "weights": {
+    "kind": "LoRA adapter merged for serving",
+    "sha256": {
+      "adapter/adapter_model.safetensors": "2304bd8e9d5c11a0a2362dc5dc6dd927b1339cd8760612835ebf9b52e4899ca3"
+    }
+  },
+  "training": {
+    "arm": "g26_b11_mix",
+    "lineage": [
+      {
+        "arm": "g26_lora",
+        "teacher": "teacher",
+        "train_source": "full corpus",
+        "lr": 0.0002,
+        "epochs": 1,
+        "lora_rank": 64,
+        "steps": 1401,
+        "seconds": 6385.057453632355
+      },
+      {
+        "arm": "g26_b11",
+        "teacher": "teacher11",
+        "train_source": "full corpus",
+        "lr": 0.0001,
+        "epochs": 0.5,
+        "lora_rank": 64,
+        "steps": 700,
+        "seconds": 3119.0846474170685
+      },
+      {
+        "arm": "g26_b11_mix",
+        "teacher": "teacher11",
+        "train_source": "bobcat1_mixture",
+        "lr": 5e-05,
+        "epochs": 1,
+        "lora_rank": 64,
+        "steps": 214,
+        "seconds": 868.2706663608551
+      }
+    ],
+    "corpus_manifest_sha256": "34d1ffcbd8ee10c5ec58320c1905d1bd75a6f9a7c848d5f72fd7249511194200",
+    "teachers": {
+      "teacher": {
+        "model": "bobcat-1: Qwen3.8-27B + release LoRA 2704495d..., merged BF16, vLLM",
+        "temperature": 1.1488982760285609
+      },
+      "teacher11": {
+        "model": "bobcat-1.1: Qwen3.8-27B + LoRA 33a323d1..., merged BF16, vLLM",
+        "temperature": 1.1884893953889413
+      },
+      "logits_sha256": {
+        "teacher_bobcat1": {
+          "train": {
+            "rows": 447903,
+            "sha256": "a20858dd48f0e8ecc876596e95620431259cca6225c8d2f782b893343184bfd3"
+          },
+          "monitor": {
+            "rows": 13022,
+            "sha256": "bcc6187d4ebb5003c0b9766d87c70e000e75372f93ba3397e832b5675ea486c0"
+          },
+          "b1-monitor": {
+            "rows": 1589,
+            "sha256": "9c1ccf662e1de6fedff79bbe099d849f6ee99ab62f79d81146f0437d1940d861"
+          }
+        },
+        "teacher_bobcat11": {
+          "train": {
+            "rows": 447903,
+            "sha256": "7a6fef5420141eab90c4d0dd50348ed30e600f5d3d4f52fe68b641fffea44804"
+          },
+          "monitor": {
+            "rows": 13022,
+            "sha256": "47569c2a0c989e7c2a4eba76a302961ba296055468a55ee1643b67f02c51cbda"
+          },
+          "b1-monitor": {
+            "rows": 1589,
+            "sha256": "9fec71621d77069c487eec00c38a0bd4b062506906aef18c8f43e888bf7d3f19"
+          }
+        }
+      }
+    },
+    "jev_outputs_used": false,
+    "typesafe_or_semif_rows_used": false,
+    "held_out_task": "product_tool_call"
+  },
+  "readout": {
+    "contract": "first answer position, offered identifier logits only, piecewise compile, closed JSON by the host",
+    "generated_tokens": 0
+  },
+  "calibration": {
+    "temperature": 0.8911980656311957,
+    "fitted_on": "product eval v2 calibration split"
+  },
+  "precision": {
+    "serving": "fp8"
+  },
+  "evaluation": {
+    "dev": {
+      "task_macro": 0.9206587225869257,
+      "tasks": {
+        "product_citation": 0.9981818181818182,
+        "product_classification": 0.77,
+        "product_injection": 0.9472727272727273,
+        "product_routing": 0.9963302752293578,
+        "product_search": 0.8839907192575406,
+        "product_tool_call": 0.9281767955801105
+      },
+      "nll": 0.28545979981964037,
+      "ece": 0.010652558974047242,
+      "vs_bobcat1": {
+        "difference": -0.01348243392833326,
+        "ci95": [
+          -0.02736236863174024,
+          -0.0006648555000579037
+        ],
+        "rows": 3188,
+        "components": 1161
+      },
+      "vs_zeroshot_base": {
+        "difference": 0.054169775926077746,
+        "ci95": [
+          0.0374704044468287,
+          0.07214868028604482
+        ],
+        "rows": 3188,
+        "components": 1161
+      }
+    },
+    "typesafe20": {
+      "agreement_common": 0.9118541033434651,
+      "mass_on_consensus": 0.8616008085899162,
+      "total_variation": 0.13043998258707756,
+      "n_common": 329,
+      "workflow_macro": 0.8544833410102871,
+      "jev_published_agreement": 0.9088145896656535,
+      "jev_published_macro": 0.8647677173126275,
+      "median_case_seconds": 0.2975,
+      "mean_case_seconds": 0.62075,
+      "invoice_median_seconds": 1.4952,
+      "requests": {
+        "count": 46,
+        "failed": 0,
+        "retried": 0
+      }
+    },
+    "semif": {
+      "summary": {
+        "authored144": {
+          "mean_family_balanced_accuracy": 0.8999721526037315,
+          "scored": 144,
+          "coverage": 1.0
+        },
+        "wanli256": {
+          "mean_family_balanced_accuracy": 0.7337893296853625,
+          "scored": 256,
+          "coverage": 1.0
+        },
+        "perturbations108": {
+          "mean_family_balanced_accuracy": 0.9518518518518518,
+          "scored": 108,
+          "coverage": 1.0
+        },
+        "stability": {
+          "base_original": 0.9629629629629629,
+          "missing_evidence": 0.7777777777777778,
+          "option_reversal": 0.9296296296296296,
+          "criterion_wrapper": 0.9629629629629629,
+          "irrelevant_context": 0.9629629629629629
+        },
+        "typesafe102": {
+          "rows": 102,
+          "cases": 20,
+          "equal_case_modal_agreement": 0.8959615384615385,
+          "equal_case_total_variation": 0.10955682270209181
+        },
+        "every204": {
+          "judge-grid": {
+            "rows": 36,
+            "correct": 31,
+            "accuracy": 0.8611111111111112
+          },
+          "code-rag": {
+            "rows": 48,
+            "correct": 46,
+            "accuracy": 0.9583333333333334,
+            "queries": 6,
+            "recall_at_1": 1.0,
+            "recall_at_3": 1.0,
+            "mrr": 1.0
+          },
+          "company-brain": {
+            "rows": 70,
+            "correct": 69,
+            "accuracy": 0.9857142857142858,
+            "queries": 7,
+            "recall_at_1": 0.9285714285714286,
+            "recall_at_3": 1.0,
+            "mrr": 1.0
+          },
+          "action-firewall": {
+            "rows": 50,
+            "actions": 10,
+            "correct": 9,
+            "accuracy": 0.9
+          }
+        }
+      },
+      "errors": {}
+    },
+    "shape777": {
+      "parallel_seconds": [
+        5.605147141999623,
+        0.8278613929996936,
+        0.8876977899999474
+      ],
+      "sequential_seconds": [
+        2.0183775699988473,
+        2.0380255399995804,
+        2.013017769999351
+      ],
+      "failed": 0
+    },
+    "bench": {
+      "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+      "quantization": "fp8",
+      "dev_macro_engine": 0.9183815017860996,
+      "argmax_agreement_with_eval_path": 0.9840025094102886,
+      "w1_p50_ms": 24.835535999955027,
+      "w1_p95_ms": 25.238403999537695,
+      "w2_cold_batch_p50_ms": 195.99596000080055,
+      "w2_parent_then_branches_p50_ms": 221.4531480003643,
+      "w3_8k_p50_ms": 271.61643500039645,
+      "w3_16k_p50_ms": 682.3680890011019,
+      "max_prompt_tokens_per_second": 48749.65165360679,
+      "workflow_replay_median_case_seconds": 0.2545,
+      "workflow_replay_later_question_cached_share": 0.9003628881331778,
+      "cache_block_size": 16,
+      "mamba_cache_mode": "none"
+    }
+  },
+  "final_evaluation": {
+    "status": "not opened",
+    "reason": "Flash 1.1 is an additional tier; the fresh sealed final stays for a release that replaces a model"
+  },
+  "source": {
+    "files_sha256": {
+      "src/bobcat/flash_data.py": "c05f8e76b836c110d7f78f3fa94b5a54ddc8cbb38df26e82d324434347d11393",
+      "src/bobcat/flash_families.py": "771c4b99972856fe9c1eab7919cdc217be946962d1d46bcc15ca9a101e4882f1",
+      "src/bobcat/flash_teacher.py": "3d677ab43b0ca169c9fa374522b4e2d20427fbb52f38844591d99be632c52511",
+      "src/bobcat/flash_train.py": "111925fd2335f95e87f06c62652f8cfd57cb60afd802dc2f2bcac07a572d66c4",
+      "src/bobcat/flash_packed.py": "7522c0e2858620f0368d30ea91e08496916d5c61bef37df02a6b978866447d1a",
+      "src/bobcat/flash_server.py": "65b57c1461ece095c9300b2afd58cc04dd51eee55020670b45dff61b3899ce96",
+      "src/bobcat/flash_report.py": "8d7858ec2792b517ebff45424ccbc46dfb8adaee038d2a89928d16103a47431d",
+      "src/bobcat/student_readout.py": "f8d3ceb8e1f335093b0db2f3f6702a239ff12743eedab09a64462ffd7daa8f33",
+      "src/bobcat/protocol.py": "1f44f37442a79bbbef75e5106afec6e56304617894cda5008f546ff391675206",
+      "src/bobcat/api_server.py": "737fa2f39c7501fc12352289c54f6306bebd18e21156594cadb9c7293acb2e3a",
+      "configs/flash-arms.json": "f20c11ff38a278e13e43db89ed1dd9457a4fe1e9d54c1409d7414f395ddee4a0"
+    }
+  },
+  "serving_artifacts": {
+    "added_at": "2026-09-26T11:03:42+00:00",
+    "note": "Additive serving builds and settings for the frozen adapter above. The adapter, base revision, tokenizer and every frozen field are unchanged. All figures are development measurements (product eval v2 dev, TypeSafe 20) on one RTX PRO 6000; no sealed final was opened.",
+    "nvfp4": {
+      "built_at": "2026-09-26T09:14:31Z",
+      "derived_from": {
+        "adapter_model_sha256": "2304bd8e9d5c11a0a2362dc5dc6dd927b1339cd8760612835ebf9b52e4899ca3",
+        "base": {
+          "repo": "google/gemma-4-26B-A4B-it",
+          "revision": "4d7ae4984b7db7de8f8457170b3f1a419ee76d52"
+        },
+        "merge": "bobcat.student_merge (fp32 product and sum, BF16 storage)",
+        "merged_shards_sha256": {
+          "model-00001-of-00002.safetensors": "6847aa860e793d33c308683308efc6815ea420604d2d805abab8a416acfd14a7",
+          "model-00002-of-00002.safetensors": "d72e43850d618d452c6ceabf0c38f29c030bdb7e31e2a6a2149820edcf5bb72a"
+        }
+      },
+      "tool": "scripts/nvfp4_quantize.py, llmcompressor 0.14.0 (compressed-tensors 0.19.0): NVFP4 W4A4, group 16, FP8 scales",
+      "calibration": "256 product-eval v2 DEV compiled prompts <= 4,096 tokens (seed 20260926); every token through every expert (moe_calibrate_all_experts); ids in bobcat-nvfp4.json and excluded from the drift rows",
+      "experts": "3D expert tensors linearized to one Linear per expert projection before calibration; 11,520 expert projections quantized, none BF16",
+      "kept_bf16": [
+        "lm_head",
+        "re:.*visual.*",
+        "re:.*in_proj_a$",
+        "re:.*in_proj_b$",
+        "re:.*router.*",
+        "re:.*vision_tower.*",
+        "re:.*embed_vision.*",
+        "re:.*audio_tower.*",
+        "re:.*embed_audio.*"
+      ],
+      "linear_census": {
+        "vision": {
+          "quantized": 0,
+          "bf16": 191
+        },
+        "language": {
+          "quantized": 205,
+          "bf16": 0
+        },
+        "router": {
+          "quantized": 0,
+          "bf16": 30
+        },
+        "expert": {
+          "quantized": 11520,
+          "bf16": 0
+        },
+        "lm_head": {
+          "quantized": 0,
+          "bf16": 1
+        }
+      },
+      "fused_scale_check": {
+        "groups_checked": 3900,
+        "groups_with_unequal_scales": 0,
+        "examples": []
+      },
+      "vllm_kernels": {
+        "dense": "CutlassNvFp4LinearKernel",
+        "moe": "VLLM_CUTLASS",
+        "attention": "TRITON_ATTN",
+        "global_scale_warning": "none"
+      },
+      "size_bytes": {
+        "model.safetensors": 16423500596
+      },
+      "files_sha256": {
+        "bobcat-nvfp4.json": "cdbe0335a3136ab18ec0381ac718992b688dd3e314f76df4da910718367ed07a",
+        "chat_template.jinja": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4",
+        "config.json": "d8a3ee5a5392815fe2d3950f30e73241016a2c05da4d27385682467125b2afe3",
+        "generation_config.json": "d4226bbe3117d2d253ba4609720ba82c6c4ce4627a9a6ae05387c78983ac03de",
+        "recipe.yaml": "294722fb6e5368f3e9d13bfdee113dc5326d853d80b2753bc3b9d5ff2c92b356",
+        "tokenizer.json": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+        "tokenizer_config.json": "9f4fec4b1dc6ecddf8f4a92e9caea5971c0e67d81309f3f9066a2bee8c362633",
+        "model.safetensors": "d8a3d0e3ea9b7513bddc6bacaefa34ee263f0073a3725a45b53a9716a17636b4"
+      },
+      "tokenizer_matches_frozen": true,
+      "drift_on_dev_rows_not_used_for_calibration": {
+        "rows": 2932,
+        "excluded_calibration_rows": 256,
+        "base": "fp8",
+        "temperature": 0.8911980656311957,
+        "sets": {
+          "bf16_eval_path": {
+            "accuracy": 0.9154,
+            "task_macro": 0.9179,
+            "minus_fp8": 0.0027,
+            "minus_fp8_95ci": [
+              -0.001,
+              0.0066
+            ],
+            "argmax_agreement_with_fp8": 0.9857,
+            "near_tie_agreement_with_fp8": 0.5972,
+            "near_tie_rows": 72,
+            "task_accuracy": {
+              "product_citation": 0.998,
+              "product_classification": 0.7637,
+              "product_injection": 0.9471,
+              "product_routing": 0.996,
+              "product_search": 0.8798,
+              "product_tool_call": 0.9231
+            }
+          },
+          "fp8": {
+            "accuracy": 0.9127,
+            "task_macro": 0.9165,
+            "minus_fp8": null,
+            "minus_fp8_95ci": null,
+            "argmax_agreement_with_fp8": null,
+            "near_tie_agreement_with_fp8": null,
+            "near_tie_rows": null,
+            "task_accuracy": {
+              "product_citation": 0.996,
+              "product_classification": 0.7615,
+              "product_injection": 0.9431,
+              "product_routing": 0.996,
+              "product_search": 0.8736,
+              "product_tool_call": 0.929
+            }
+          },
+          "nvfp4": {
+            "accuracy": 0.9059,
+            "task_macro": 0.9026,
+            "minus_fp8": -0.0068,
+            "minus_fp8_95ci": [
+              -0.0159,
+              0.0014
+            ],
+            "argmax_agreement_with_fp8": 0.9635,
+            "near_tie_agreement_with_fp8": 0.5278,
+            "near_tie_rows": 72,
+            "task_accuracy": {
+              "product_citation": 0.998,
+              "product_classification": 0.7593,
+              "product_injection": 0.9392,
+              "product_routing": 0.9939,
+              "product_search": 0.8674,
+              "product_tool_call": 0.858
+            }
+          }
+        },
+        "pairs": {
+          "fp8_cached_vs_uncached": {
+            "rows": 2932,
+            "argmax_agreement": 0.9962,
+            "disagreements": 11,
+            "near_tie_margin": 0.1,
+            "near_tie_rows": 67,
+            "near_tie_agreement": 0.8806,
+            "max_probability_gap": 0.1733,
+            "mean_probability_gap": 0.0039,
+            "accuracy": 0.9134,
+            "reference_accuracy": 0.9127,
+            "minus_reference_95ci": [
+              -0.0011,
+              0.0027
+            ]
+          },
+          "nvfp4_cached_vs_uncached": {
+            "rows": 2932,
+            "argmax_agreement": 0.9986,
+            "disagreements": 4,
+            "near_tie_margin": 0.1,
+            "near_tie_rows": 77,
+            "near_tie_agreement": 0.961,
+            "max_probability_gap": 0.2204,
+            "mean_probability_gap": 0.0016,
+            "accuracy": 0.9035,
+            "reference_accuracy": 0.9035,
+            "minus_reference_95ci": [
+              -0.001,
+              0.001
+            ]
+          },
+          "nvfp4_uncached_vs_fp8_uncached": {
+            "rows": 2932,
+            "argmax_agreement": 0.9632,
+            "disagreements": 108,
+            "near_tie_margin": 0.1,
+            "near_tie_rows": 67,
+            "near_tie_agreement": 0.5522,
+            "max_probability_gap": 0.9276,
+            "mean_probability_gap": 0.0308,
+            "accuracy": 0.9035,
+            "reference_accuracy": 0.9127,
+            "minus_reference_95ci": [
+              -0.017,
+              -0.0017
+            ]
+          }
+        }
+      },
+      "speed_one_rtx_pro_6000": {
+        "w1_p50_ms": 21.6,
+        "w2_cold_batch_p50_ms": 201.7,
+        "w3_8k_16k_p50_ms": [
+          286.1,
+          719.8
+        ],
+        "max_prompt_tokens_per_second": 44012.0,
+        "typesafe20_http": {
+          "agreement_common": 0.8906,
+          "mass_on_consensus": 0.8291,
+          "total_variation": 0.1327,
+          "n_common": 329,
+          "workflow_macro": 0.8299,
+          "jev_published_agreement": 0.9088,
+          "median_case_seconds": 0.2838,
+          "mean_case_seconds": 0.6226,
+          "invoice_median_seconds": 1.634,
+          "requests": {
+            "count": 46,
+            "failed": 0,
+            "retried": 0
+          },
+          "health": {
+            "model": "bobcat-flash-1.1",
+            "engine": "vllm (nvfp4-pack-quantized), all schedule, cached state encoding",
+            "inflight": 0
+          }
+        },
+        "w2_cached_vs_cold_pass": {
+          "questions": 64,
+          "argmax_agreement": 0.9375,
+          "max_probability_gap": 0.21353136555185231
+        },
+        "dev_cached_vs_uncached": {
+          "rows": 3188,
+          "seconds": 186.6689394980001,
+          "cached_pass_cache": {
+            "requests": 3713,
+            "prompt_tokens": 6308475,
+            "cached_tokens": 6246528,
+            "cached_share": 0.990180352620879
+          },
+          "argmax_agreement": 0.9984316185696361,
+          "max_probability_gap": 0.20096000333402553,
+          "mean_probability_gap": 0.0016254005654700973
+        }
+      },
+      "status": "built and measured; NOT the recommended serving build on RTX PRO 6000: slower than FP8 (44.0K vs 48.6K prompt tokens/s) and less accurate (dev and TypeSafe 20). A different numerical artifact from the evaluated adapter."
+    },
+    "nvfp4_experts_fp8_dense_attempt": {
+      "status": "failed, not uploaded: the FP8 group's regex targets named `language_model.layers`, which vLLM's module names (`language_model.model.layers`) do not match, so vLLM read the FP8 tensors as unquantized weights (dev engine macro 0.375). Fixed in scripts/nvfp4_quantize.py; not rebuilt, because the kernel profile shows the NVFP4 MoE path itself is slower than FP8 here."
+    },
+    "serving_config_recommended": {
+      "precision": "FP8 (vLLM online dynamic FP8 of the merged BF16 weights, --quantization fp8); the merged shards' sha256 are above",
+      "engine": "vLLM 0.30.0, TRITON_ATTN (FA4 unavailable for head dims 256/512)",
+      "server": "bobcat.flash_server, or bobcat.api_server (state tokenized once per request, same token IDs), --schedule all",
+      "max_model_len": 32832,
+      "max_num_seqs": 256,
+      "engine_args": {
+        "max_num_batched_tokens": 16384
+      },
+      "moe_kernel_config": {
+        "env": "VLLM_TUNED_CONFIG_FOLDER",
+        "file": "E=128,N=704,device_name=NVIDIA_RTX_PRO_6000_Blackwell_Server_Edition,dtype=fp8_w8a8.json",
+        "source": "vLLM 0.30.0 bundled E=128,N=704 fp8_w8a8 config for the RTX PRO 6000 Blackwell Workstation Edition, copied under the Server Edition name",
+        "sha256": "bda8977a981a6a2c48c54dffbd519c62c035f170220bc575de98483799e246b7",
+        "effect": {
+          "prompt_tokens_per_second": [
+            48594.0,
+            50776.0
+          ],
+          "w1_p50_ms": [
+            24.81,
+            25.66
+          ]
+        }
+      },
+      "temperature": 0.8911980656311957,
+      "measured": {
+        "w1_p50_ms": 24.81,
+        "max_prompt_tokens_per_second": 48594.0,
+        "best_throughput": {
+          "run": "tput_fp8_32768_512_wsconfig",
+          "tokens_per_second": 51303.0
+        },
+        "typesafe20_http": {
+          "agreement_common": 0.9119,
+          "mass_on_consensus": 0.863,
+          "total_variation": 0.1286,
+          "n_common": 329,
+          "workflow_macro": 0.8563,
+          "jev_published_agreement": 0.9088,
+          "median_case_seconds": 0.2825,
+          "mean_case_seconds": 0.5973,
+          "invoice_median_seconds": 1.5023,
+          "requests": {
+            "count": 46,
+            "failed": 0,
+            "retried": 0
+          },
+          "health": {
+            "model": "bobcat-flash-1.1",
+            "engine": "vllm (fp8), all schedule, cached state encoding",
+            "inflight": 0
+          }
+        },
+        "dev_cached_vs_uncached": {
+          "rows": 3188,
+          "seconds": 191.53972410699998,
+          "cached_pass_cache": {
+            "requests": 3713,
+            "prompt_tokens": 6308475,
+            "cached_tokens": 6246528,
+            "cached_share": 0.990180352620879
+          },
+          "argmax_agreement": 0.9959222082810539,
+          "max_probability_gap": 0.15484310083986785,
+          "mean_probability_gap": 0.003967996942014583
+        }
+      }
+    },
+    "routing": {
+      "server": "bobcat.route_server: one process, Flash and Bobcat 1.1 engines on one GPU",
+      "fallback": {
+        "model": "bobcat-1.1",
+        "build": "Bobcat 1.1 NVFP4, model.safetensors sha256 c539e459763928e0778e70ffe8bac54a69b67e0768f7e5c35115fe6797c0e7bd (release/bobcat-1.1-manifest.json serving_builds.nvfp4)",
+        "temperature": 1.1884893953889413
+      },
+      "rule": {
+        "out_of_range_before_any_pass": "more than 64 candidates, or fewer than 50% of letters Hangul or ASCII Latin (same 225 dev rows as the offline rule)",
+        "low_confidence": "Flash top probability at T=0.8912 below 0.8 (threshold chosen on the calibration split, bobcat-flash report 5.9)"
+      },
+      "recommended": "flash FP8 (gpu_memory_utilization 0.40) + fallback NVFP4 (0.46)",
+      "flash_fp8": {
+        "flash_build": "fp8",
+        "dev_rows": 3188,
+        "auto": {
+          "task_macro": 0.9311,
+          "accuracy": 0.9297,
+          "flash_share": 0.8422,
+          "reason_counts": {
+            "candidates": 225,
+            "in_range": 2685,
+            "low_confidence": 278
+          },
+          "latency_ms_by_reason": {
+            "candidates": {
+              "p50": 479.98,
+              "p95": 577.3,
+              "mean": 405.6
+            },
+            "in_range": {
+              "p50": 32.21,
+              "p95": 45.82,
+              "mean": 31.8
+            },
+            "low_confidence": {
+              "p50": 93.76,
+              "p95": 145.75,
+              "mean": 102.7
+            }
+          },
+          "latency_ms_all": {
+            "p50": 33.33,
+            "p95": 215.72,
+            "mean": 64.4
+          }
+        },
+        "flash_only": {
+          "task_macro": 0.9212,
+          "accuracy": 0.9184,
+          "flash_share": 1.0,
+          "reason_counts": {
+            "in_range": 3188
+          },
+          "latency_ms_by_reason": {
+            "in_range": {
+              "p50": 32.3,
+              "p95": 90.15,
+              "mean": 42.5
+            }
+          },
+          "latency_ms_all": {
+            "p50": 32.3,
+            "p95": 90.15,
+            "mean": 42.5
+          }
+        },
+        "bobcat_only": {
+          "task_macro": 0.9341,
+          "accuracy": 0.9319,
+          "flash_share": 0.0,
+          "reason_counts": {
+            "forced": 3188
+          },
+          "latency_ms_by_reason": {
+            "forced": {
+              "p50": 61.35,
+              "p95": 216.07,
+              "mean": 90.9
+            }
+          },
+          "latency_ms_all": {
+            "p50": 61.35,
+            "p95": 216.07,
+            "mean": 90.9
+          }
+        },
+        "paired_task_macro": {
+          "auto_minus_flash": {
+            "difference": 0.0098,
+            "ci95": [
+              0.0032,
+              0.017
+            ]
+          },
+          "auto_minus_bobcat": {
+            "difference": -0.003,
+            "ci95": [
+              -0.0077,
+              0.0018
+            ]
+          },
+          "flash_minus_bobcat": {
+            "difference": -0.0128,
+            "ci95": [
+              -0.0222,
+              -0.0037
+            ]
+          }
+        },
+        "offline_rule_same_rows": true,
+        "typesafe20": {
+          "agreement_common": 0.9179,
+          "mass_on_consensus": 0.8704,
+          "total_variation": 0.125,
+          "n_common": 329,
+          "workflow_macro": 0.8755,
+          "jev_published_agreement": 0.9088,
+          "median_case_seconds": 0.5446,
+          "mean_case_seconds": 1.0522,
+          "invoice_median_seconds": 2.7377,
+          "requests": {
+            "count": 46,
+            "failed": 0,
+            "retried": 0
+          },
+          "routing": {
+            "questions": 418,
+            "flash_share": 0.8229665071770335,
+            "requests_with_fallback": 33
+          }
+        }
+      },
+      "flash_nvfp4": {
+        "flash_build": "nvfp4",
+        "dev_rows": 3188,
+        "auto": {
+          "task_macro": 0.9315,
+          "accuracy": 0.931,
+          "flash_share": 0.8272,
+          "reason_counts": {
+            "candidates": 225,
+            "in_range": 2637,
+            "low_confidence": 326
+          },
+          "latency_ms_by_reason": {
+            "candidates": {
+              "p50": 480.8,
+              "p95": 578.47,
+              "mean": 406.3
+            },
+            "in_range": {
+              "p50": 32.97,
+              "p95": 39.77,
+              "mean": 29.6
+            },
+            "low_confidence": {
+              "p50": 94.24,
+              "p95": 139.55,
+              "mean": 99.0
+            }
+          },
+          "latency_ms_all": {
+            "p50": 33.19,
+            "p95": 216.26,
+            "mean": 63.3
+          }
+        },
+        "flash_only": {
+          "task_macro": 0.8998,
+          "accuracy": 0.9053,
+          "flash_share": 1.0,
+          "reason_counts": {
+            "in_range": 3188
+          },
+          "latency_ms_by_reason": {
+            "in_range": {
+              "p50": 32.62,
+              "p95": 88.22,
+              "mean": 40.9
+            }
+          },
+          "latency_ms_all": {
+            "p50": 32.62,
+            "p95": 88.22,
+            "mean": 40.9
+          }
+        },
+        "bobcat_only": {
+          "task_macro": 0.9356,
+          "accuracy": 0.9319,
+          "flash_share": 0.0,
+          "reason_counts": {
+            "forced": 3188
+          },
+          "latency_ms_by_reason": {
+            "forced": {
+              "p50": 62.0,
+              "p95": 216.14,
+              "mean": 91.2
+            }
+          },
+          "latency_ms_all": {
+            "p50": 62.0,
+            "p95": 216.14,
+            "mean": 91.2
+          }
+        },
+        "paired_task_macro": {
+          "auto_minus_flash": {
+            "difference": 0.0317,
+            "ci95": [
+              0.0232,
+              0.0405
+            ]
+          },
+          "auto_minus_bobcat": {
+            "difference": -0.0041,
+            "ci95": [
+              -0.0103,
+              0.0016
+            ]
+          },
+          "flash_minus_bobcat": {
+            "difference": -0.0358,
+            "ci95": [
+              -0.0475,
+              -0.0241
+            ]
+          }
+        },
+        "offline_rule_same_rows": true,
+        "typesafe20": {
+          "agreement_common": 0.921,
+          "mass_on_consensus": 0.8611,
+          "total_variation": 0.129,
+          "n_common": 329,
+          "workflow_macro": 0.8822,
+          "jev_published_agreement": 0.9088,
+          "median_case_seconds": 0.5557,
+          "mean_case_seconds": 1.1133,
+          "invoice_median_seconds": 3.2028,
+          "requests": {
+            "count": 46,
+            "failed": 0,
+            "retried": 0
+          },
+          "routing": {
+            "questions": 418,
+            "flash_share": 0.7727272727272727,
+            "requests_with_fallback": 34
+          }
+        }
+      },
+      "offline_cross_check": {
+        "flash_bf16_eval_path+bobcat11_bf16_eval_path": {
+          "flash_share": 0.8378293601003765,
+          "task_macro": 0.9359574520308787
+        },
+        "flash_bf16_eval_path+bobcat11_nvfp4": {
+          "flash_share": 0.8378293601003765,
+          "task_macro": 0.9333084106952162
+        },
+        "flash_bf16_eval_path alone": {
+          "task_macro": 0.9206587225869257
+        },
+        "flash_fp8+bobcat11_bf16_eval_path": {
+          "flash_share": 0.8428481806775407,
+          "task_macro": 0.9340135804789647
+        },
+        "flash_fp8+bobcat11_nvfp4": {
+          "flash_share": 0.8428481806775407,
+          "task_macro": 0.9318609182475699
+        },
+        "flash_fp8 alone": {
+          "task_macro": 0.9195103491834856
+        },
+        "flash_nvfp4+bobcat11_bf16_eval_path": {
+          "flash_share": 0.8268506900878294,
+          "task_macro": 0.9332550464260746
+        },
+        "flash_nvfp4+bobcat11_nvfp4": {
+          "flash_share": 0.8268506900878294,
+          "task_macro": 0.9310112863192055
+        },
+        "flash_nvfp4 alone": {
+          "task_macro": 0.9046308970733999
+        },
+        "bobcat11_bf16_eval_path alone": {
+          "task_macro": 0.9392002538424337
+        },
+        "bobcat11_nvfp4 alone": {
+          "task_macro": 0.9336448857766246
+        }
+      }
+    }
+  },
+  "public_copy": {
+    "derived_from_sha256": "ca9a9be3d5262ddd94220287cc414bdcb89d5c50ab6a8ff6fedaa37344b1f047",
+    "changes": "storage locations, cost figures, host and instance details, and internal report and orchestration paths removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
+  }
+}

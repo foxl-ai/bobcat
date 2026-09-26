@@ -70,6 +70,15 @@ scripts/*
 !scripts/typesafe_workflow_eval.py
 !scripts/summarize_student_zero_shot.py
 !scripts/survey_student_candidates.py
+!scripts/flash_injection_eval.py
+!scripts/flash_semif_eval.py
+!scripts/long_context_eval.py
+!scripts/nvfp4_quantize.py
+!scripts/quant_drift.py
+!scripts/route_dev_eval.py
+!scripts/semif_bench.py
+!scripts/serve_eval.py
+!scripts/state_cache_check.py
 tests/test_aws_budget.py
 tests/test_checkpoint_gpu_profile.py
 tests/test_finish_gpu_boot.py

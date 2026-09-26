@@ -150,11 +150,23 @@ TypeSafe's proprietary architecture, reward function, or training loop.
 
 ## Qwen3.8-27B base model
 
-Bobcat 1 is a LoRA adapter for `Qwen/Qwen3.8-27B`, revision
+Bobcat 1 and Bobcat 1.1 are LoRA adapters for `Qwen/Qwen3.8-27B`, revision
 `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`, released by the Qwen team under the
-Apache License 2.0. The adapter is a derivative of that model and is released under
+Apache License 2.0. The adapters are derivatives of that model and are released under
 the same license. Its weights are not redistributed here; the serving recipe
 downloads them from the upstream repository at the pinned revision.
+
+## Gemma 4 26B-A4B base model
+
+Bobcat Flash 1.1 is a LoRA adapter for `google/gemma-4-26B-A4B-it`, revision
+`4d7ae4984b7db7de8f8457170b3f1a419ee76d52`, released by Google DeepMind. That revision's
+model card declares `license: apache-2.0` and links the
+[Gemma 4 license](https://ai.google.dev/gemma/docs/gemma_4_license) page, which is the
+Apache License 2.0 text (checked 2026-09-26). The adapter is a derivative of that model and
+is released under the same license. Its weights are not redistributed here; the serving
+recipe downloads them from the upstream repository at the pinned revision. Bobcat Flash
+was distilled from Bobcat 1 and a Bobcat 1.1 candidate (both Apache-2.0 derivatives of
+Qwen3.8-27B); no Jev output was used.
 
 ## Further training data
 
@@ -172,10 +184,35 @@ decisions are not relicensed.
 - **HelpSteer 2 and 3:** Wang et al. (2024, 2025), NVIDIA, CC BY 4.0. Only the mean
   attribute ratings are used, as observed means.
 
+Bobcat 1.1 adds (derived decisions keep each source's license and attribution):
+
+- **SNLI:** Bowman et al. (2015), *A large annotated corpus for learning natural language
+  inference*, Stanford NLP, CC BY-SA 4.0 (`stanfordnlp/snli`, revision `cdb5c3d5`).
+  Premise/hypothesis pairs as relation and evidence/claim decisions, and unrelated-premise
+  copies whose gold is the abstain label.
+- **SQuAD 2.0:** Rajpurkar, Jia and Liang (2018), *Know What You Don't Know: Unanswerable
+  Questions for SQuAD*, CC BY-SA 4.0 (`rajpurkar/squad_v2`, revision `3ffb306f`).
+  Answerable and unanswerable questions on the same Wikipedia passage as "is the answer
+  stated?" decisions.
+
+Bobcat Flash 1.1's training corpus draws on the sources above (except SQuAD 2.0) and adds:
+
+- **MultiNLI:** Williams, Nangia and Bowman (2018), *A Broad-Coverage Challenge Corpus for
+  Sentence Understanding through Inference* (`nyu-mll/multi_nli`, revision `da70db2a`).
+  The dataset card states that most of the corpus is released under the Open American
+  National Corpus license; in the fiction section, *Seven Swords* is under CC BY-SA 3.0,
+  *Living History* and *Password Incorrect* are under CC BY 3.0, and the remaining works are
+  in the public domain in the United States. Premise/hypothesis training pairs as
+  evidence/claim decisions.
+- **SNLI** (above) training pairs, the same way.
+
 ## Evaluation-only data
 
 KoBEST (above), KMMLU, HAE-RAE Bench 1.1, CLIcK, MMLU and HellaSwag were used only
 to evaluate Bobcat and are not redistributed in this repository; see each dataset's
 card for its license. The comparison with Jev uses the workflow examples TypeSafe
 publishes at evals.typesafe.ai; those files are fetched at run time by
-`scripts/typesafe_workflow_eval.py`, verified by hash, and not redistributed.
+`scripts/typesafe_workflow_eval.py`, verified by hash, and not redistributed. The SemIf
+benchmark bundle (`TheoLeeCJ/SemIf-OpenJev`, MIT), including its Every lab rows and the
+Jev figures TypeSafe released for 102 aligned rows, was used only for evaluation through
+`scripts/semif_bench.py` with SemIf's own evaluators; its rows are not redistributed.

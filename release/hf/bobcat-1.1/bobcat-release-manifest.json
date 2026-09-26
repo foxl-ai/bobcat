@@ -1,0 +1,550 @@
+{
+  "schema": "bobcat-release-manifest-v1",
+  "name": "bobcat-1.1",
+  "status": "frozen",
+  "frozen_at": "2026-09-26T10:13:35+00:00",
+  "scope": "Bobcat 1.1 (arm r16semif): the r16 adapter continued on SQuAD 2.0 answer-stated pairs, English option-order permutations and replay; replaces r16 as bobcat-1.1 under the rule registered before its data existed; frozen before the second fresh final is opened; Bobcat 1 stays unchanged",
+  "output_contract": "Choice / Noul / Score only; host-built closed JSON (SPEC G0); no generated tokens",
+  "base": {
+    "repo": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "license": "Apache-2.0",
+    "dtype": "bfloat16"
+  },
+  "tokenizer": {
+    "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+    "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+    "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+    "config.json": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+    "identifiers_sha256": "d6e43502761f22738fe08da541d201347d80672754199b7f9b9937c404ba55d0",
+    "template_sha256": "6c66698b2c93d4c21922a0bb88589380c726313bdea6529a5822c01c3785e313"
+  },
+  "adapter": {
+    "kind": "LoRA",
+    "rank": 16,
+    "alpha": 32,
+    "adapter_model_sha256": "7351d959b66ec8c425fc95bcc76727a722e9d3f763ad45c90c44d620bec583b2",
+    "arm": "r16semif",
+    "trainable_parameters": 116727808,
+    "steps": 313,
+    "lr": 2e-05,
+    "seed": 20260925,
+    "initialised_from": "bobcat-1.1 r16 adapter 33a323d1f6fe2af04aad0973370baa85479dfb0414de261732b33ca110b792b2",
+    "continuation_data": {
+      "rows": 10000,
+      "tokens": 6547006,
+      "long_rows": 0,
+      "sha256": "08c8aa4b693add7bc04f2fed5ca24f0310021b7a91baf12662b9ef78cea2a86c",
+      "parts": {
+        "fix": 7000
+      }
+    }
+  },
+  "readout": {
+    "kind": "vocab first position, offered identifiers only",
+    "compile": "student_readout piecewise, max_branch_tokens 16384",
+    "evaluation_path": "bobcat.student_train --eval-only (unmerged PEFT LoRA, batch 1), identical to the dev evaluation",
+    "decision_rule": "argmax over offered candidates; request order breaks ties (Noul: yes only if p(yes) > 0.5)"
+  },
+  "precision": "bfloat16 weights, float32 readout",
+  "calibration": {
+    "temperature": 1.200767737961694,
+    "fitted_on": "product-eval v2 calibration split (1,605 rows)",
+    "applies_to": "choice, noul and score"
+  },
+  "final_evaluation": {
+    "split": "product-eval fresh final for Bobcat 1.1",
+    "path": "final.jsonl",
+    "data_sha256": "30a9aec60c8f129ebaf787173de340a4eb42e9f34ec2997126aa01d7eae7f0ed",
+    "rows": 1614,
+    "eval_content_sha256": "10fb254fc89bfaa42e9ff7d24e02a1620418bdd383eb37e8b8db20e1882c072a",
+    "tasks": [
+      "product_citation",
+      "product_injection",
+      "product_routing",
+      "product_search"
+    ],
+    "not_available": "product_classification (every KLUE MRC news article with a publisher category was used by Bobcat 1 training) and product_tool_call (every written tool catalog is already used by a split)",
+    "authorization": "one evaluation for this manifest; any setting changed after seeing final turns final into development",
+    "baseline": "same-input zero-shot Qwen3.8-27B (LoRA at zero), piecewise compile",
+    "baseline_temperature": 1.259598169713358,
+    "comparison": {
+      "model": "bobcat-1",
+      "adapter_model_sha256": "2704495d178760769e69ff08327e17c3c529bb108a5be7a1896b15d870f4a0c7",
+      "temperature": 1.1488982760285609
+    },
+    "headline": "task macro accuracy with failed requests counted wrong; paired component bootstrap vs baseline and vs Bobcat 1",
+    "sensitivity": "also reported without the 51 routing rows whose WoS utterance text appears in any compared model's training (Flash corpus / Bobcat 1 mixture 51, Bobcat 1.1 training 46, a subset)"
+  },
+  "training_data": {
+    "mixture_schema": "bobcat-student-mixture-v11",
+    "product_public_policy_rows": {
+      "rows": 65632,
+      "by_source": {
+        "public": 32154,
+        "policy": 8374,
+        "product": 25104
+      },
+      "by_language": {
+        "en": 24009,
+        "ko": 41623
+      },
+      "by_language_origin": {
+        "original": 12707,
+        "native": 31443,
+        "unrecorded": 17117,
+        "machine_translation": 2231,
+        "human_localization": 2103,
+        "publisher_multilingual": 31
+      },
+      "by_task": {
+        "arc_challenge": 1024,
+        "arc_easy": 2033,
+        "banking77": 3411,
+        "boolq": 4834,
+        "helpsteer2": 2421,
+        "helpsteer3": 1462,
+        "klue_nli": 2423,
+        "klue_sts": 1446,
+        "klue_ynat": 1946,
+        "kornli_multinli": 1449,
+        "kornli_snli_1": 782,
+        "massive_en-US": 2923,
+        "massive_ko-KR": 1162,
+        "nsmc": 1945,
+        "policy_banking77": 2002,
+        "policy_klue_nli": 1449,
+        "policy_klue_ynat": 1487,
+        "policy_massive_en-US": 1037,
+        "policy_massive_ko-KR": 941,
+        "policy_nsmc": 1458,
+        "product_citation": 6412,
+        "product_classification": 326,
+        "product_injection": 6410,
+        "product_routing": 5422,
+        "product_search": 6534,
+        "snli": 2893
+      }
+    },
+    "derived_copies": {
+      "inject": {
+        "rows": 8100,
+        "by_language": {
+          "ko": 6693,
+          "en": 1407
+        },
+        "styles": {
+          "inline": 2574,
+          "note": 2886,
+          "verdict": 2640
+        },
+        "named": {
+          "wrong": 6478,
+          "gold": 1622
+        }
+      },
+      "abstain": {
+        "rows": 6100,
+        "by_language": {
+          "ko": 2500,
+          "en": 3600
+        },
+        "basis": {
+          "answer_sentences_removed": 1700,
+          "unrelated_premise": 1400,
+          "boolq_claim_original": 1500,
+          "boolq_claim_swapped": 1500
+        }
+      },
+      "long": {
+        "rows": 1600,
+        "by_language": {
+          "ko": 1268,
+          "en": 332
+        },
+        "levels": {
+          "16384": 311,
+          "8192": 337,
+          "32000": 289,
+          "12288": 318,
+          "24576": 345
+        },
+        "tokens": {
+          "sum": 29284606,
+          "max": 31999
+        }
+      }
+    },
+    "compiled_training_rows": 81432,
+    "compiled_tokens": 87473678,
+    "arranged_order_sha256": "24a8066afd0c27fb5060397139bcd1dee5cb3b401076237935faf35d1fb6303e",
+    "public_licences": {
+      "kornli_multinli": {
+        "repo": "kakaobrain/KorNLUDatasets",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "machine_translation"
+        ]
+      },
+      "kornli_snli_1": {
+        "repo": "kakaobrain/KorNLUDatasets",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "machine_translation"
+        ]
+      },
+      "nsmc": {
+        "repo": "e9t/nsmc",
+        "license": "CC0-1.0",
+        "language_origin": [
+          "native"
+        ]
+      },
+      "klue_nli": {
+        "repo": "klue/klue",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "unrecorded"
+        ]
+      },
+      "klue_ynat": {
+        "repo": "klue/klue",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "unrecorded"
+        ]
+      },
+      "klue_sts": {
+        "repo": "klue/klue",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "unrecorded"
+        ]
+      },
+      "helpsteer2": {
+        "repo": "nvidia/HelpSteer2",
+        "license": "CC-BY-4.0",
+        "language_origin": [
+          "original"
+        ]
+      },
+      "helpsteer3": {
+        "repo": "nvidia/HelpSteer3",
+        "license": "CC-BY-4.0",
+        "language_origin": [
+          "original",
+          "publisher_multilingual"
+        ]
+      },
+      "massive_ko-KR": {
+        "repo": "AmazonScience/massive",
+        "license": "CC-BY-4.0",
+        "language_origin": [
+          "human_localization"
+        ]
+      },
+      "massive_en-US": {
+        "repo": "AmazonScience/massive",
+        "license": "CC-BY-4.0",
+        "language_origin": [
+          "original"
+        ]
+      },
+      "banking77": {
+        "repo": "PolyAI-LDN/task-specific-datasets",
+        "license": "CC-BY-4.0",
+        "language_origin": [
+          "unrecorded"
+        ]
+      },
+      "boolq": {
+        "repo": "google/boolq",
+        "license": "CC-BY-SA-3.0",
+        "language_origin": [
+          "unrecorded"
+        ]
+      },
+      "arc_easy": {
+        "repo": "allenai/ai2_arc",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "unrecorded"
+        ]
+      },
+      "arc_challenge": {
+        "repo": "allenai/ai2_arc",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "unrecorded"
+        ]
+      },
+      "snli": {
+        "repo": "stanfordnlp/snli",
+        "license": "CC-BY-SA-4.0",
+        "language_origin": [
+          "original"
+        ],
+        "revision": "cdb5c3d5eed6ead6e5a341c8e56e669bb666725b",
+        "sha256": "ef9a7b25d97390a62aeda7abe26aec8640600f50b818eaeb9107097d60ac6620"
+      }
+    },
+    "english_share_of_training_rows": 0.3604,
+    "held_out_task": "product_tool_call (never trained)",
+    "evaluation_text_excluded": "rows whose text appears in the v2 dev/calibration/final or the fresh final were dropped before training",
+    "teacher_outputs_used": false,
+    "jev_outputs_used": false,
+    "semif_or_typesafe_rows_used": false
+  },
+  "development_summary": {
+    "selection_rule": "r16semif replaces the frozen r16 as the released bobcat-1.1 only if ALL hold, on the same BF16 unmerged path: (1) SemIf score = mean of authored144, perturbations108 and WANLI256 mean family balanced accuracy and TypeSafe102 equal-case modal agreement is higher than r16's (r16: 0.889, 0.973, 0.765, 0.830 -> 0.8642); (2) v2-dev task macro >= 93.42% (r16 93.92% minus 0.5 pt); (3) dev injection attack success <= 10.0%; (4) 30K long-context change >= -3.3 pt (r16 -2.3 minus 1.0). Otherwise r16 stays bobcat-1.1.",
+    "arms": {
+      "r16": {
+        "dev_task_macro": 0.9392002538424337,
+        "injection_attack_success": 0.06666666666666667,
+        "long_context_30k_change": -0.023333333333333317
+      },
+      "r16semif": {
+        "dev_task_macro": 0.936895698890393,
+        "injection_attack_success": 0.0775462962962963,
+        "long_context_30k_change": -0.016666666666666607
+      }
+    },
+    "selected": "r16semif",
+    "dev": {
+      "rows": 3188,
+      "failed": 0,
+      "task_macro": 0.936895698890393,
+      "tasks": {
+        "search": 0.9106728538283063,
+        "citation": 0.9963636363636363,
+        "tool_call": 0.9447513812154696,
+        "injection": 0.9690909090909091,
+        "routing": 0.9944954128440368,
+        "classification": 0.806
+      },
+      "title_k": {
+        "k200": 0.8266666666666667,
+        "k255": 0.8133333333333334,
+        "k77": 0.8666666666666667,
+        "k8": 0.92
+      },
+      "counterfactual_all_correct": 0.9366306027820711,
+      "macro_trained_tasks": 0.9353245624253776,
+      "nll_raw": 0.22737133780178034,
+      "ece_raw": 0.0213887989240598,
+      "nll_calibrated": 0.21825503105572247,
+      "ece_calibrated": 0.009819979762607099,
+      "temperature": 1.200767737961694
+    },
+    "old_final_as_development": {
+      "rows": 1607,
+      "failed": 0,
+      "task_macro": 0.939425102315005,
+      "tasks": {
+        "search": 0.8842592592592593,
+        "citation": 0.9854545454545455,
+        "tool_call": 0.9375,
+        "injection": 0.9642857142857143,
+        "routing": 0.9890510948905109,
+        "classification": 0.876
+      },
+      "title_k": {
+        "k200": 0.7368421052631579,
+        "k255": 0.7368421052631579,
+        "k77": 0.8157894736842105,
+        "k8": 0.9473684210526315
+      },
+      "counterfactual_all_correct": 0.9174311926605505,
+      "macro_trained_tasks": 0.939810122778006
+    }
+  },
+  "tests": {
+    "command": "python -m pytest (workspace root, CPU dev node) and the GPU host preflight (resume, shared prefix, data builders)",
+    "result": "CPU dev node full suite: 889 passed, 7 skipped (2026-09-26 08:10 UTC); tests/test_student_data_v11.py + tests/test_product_eval.py after the SQuAD/permutation builders: 32 passed; GPU host preflight: 25 passed"
+  },
+  "source_sha256": {
+    "src/bobcat/student_readout.py": "f8d3ceb8e1f335093b0db2f3f6702a239ff12743eedab09a64462ffd7daa8f33",
+    "src/bobcat/student_train.py": "30470a3e60fc3d97e18eb74431b9b68863fc6d47512e648da74fd0e0d5dbe1cc",
+    "src/bobcat/student_data.py": "6292433b13c017c17f7303900d702c56b4b0ef48f36f89eded82cfaf1cb7bd5c",
+    "src/bobcat/student_data_v11.py": "717fefed5dc7062dc2ae23d924d4930def0f2a06acd5bfbab5d3b81edb7e798f",
+    "src/bobcat/product_eval.py": "596b25c526e00d16c049d492a818de23943744cb143d985557971f246cf6f454",
+    "src/bobcat/protocol.py": "1f44f37442a79bbbef75e5106afec6e56304617894cda5008f546ff391675206",
+    "src/bobcat/metrics.py": "8a91f320fb0c2b7c158b764af1b94a83bc4dd1fd5d23c76be3f442f7d1fe4ef1",
+    "src/bobcat/stress.py": "40235e66a41dc1ea389448a380710ffe88766b11d3cf2dc33c94cb647882826b",
+    "scripts/score_final.py": "14abaf137b4972508f03d92327feaa4cb75018007691dc9b26f31c7adf064875",
+    "scripts/calibrate_student.py": "626852ef83c9588de93ce3f72a5c81bd2c436f5f0d83811f0580827e732a68b5",
+    "scripts/compare_student_arms.py": "68edc0da8abc508e007edcf0a37b4e197fb2ca753c6a5bd5a7ad2762d2dc3839",
+    "scripts/long_context_eval.py": "ffdf274f880d574f31cfc5bca4d6a504f716ce3840721c23c0e78f528eb91c6b",
+    "scripts/serve_eval.py": "2c968fda8975785c6a4b38948a386c07874c18fb438c7f47f819892c892b63b3",
+    "scripts/typesafe_workflow_eval.py": "6a3126a1c658f14be53ad3d5cd739e1af52b7fe351b0c645255b7fb7aab2333c",
+    "scripts/semif_bench.py": "8f44f9b648bb7edb8c8f217cf4fd5367560ae333ddfa4650cee6585c1729a822",
+    "configs/tool-situations-v3-final.json": "fb07128eb4a150bddbe13df70e14ca40812347349f4f647929f2c1d090f07132"
+  },
+  "decision": {
+    "released_arm": "r16semif",
+    "replaces": "r16 (release/bobcat-1.1-r16-manifest.json, frozen 07:50:33 UTC, fresh final 1 opened once: 95.27%)",
+    "rule_registered_at": "2026-09-26T08:50Z",
+    "result": {
+      "semif_four_set_mean": [
+        0.8751,
+        "r16 0.8642"
+      ],
+      "dev_task_macro": [
+        0.9369,
+        ">= 0.9342"
+      ],
+      "injection_attack_success": [
+        0.0775,
+        "<= 0.10"
+      ],
+      "long_context_30k_change": [
+        -0.0167,
+        ">= -0.033"
+      ]
+    },
+    "all_conditions_met": true
+  },
+  "known_limitations": [
+    "Insufficient-evidence judgments remain weak: WANLI256 insufficient recall 27/85 (Bobcat 1 39/85), 9 errors on the 36 evidence-removed SemIf rows, 5 of them at >= 0.8 confidence",
+    "30K padded state: -1.7 pt on the 300-question development set (target <= 1 pt not met)",
+    "Document-screening questions whose inserted attack sentence itself addresses the AI change their gold; attack success there is 30-40% by construction",
+    "The fresh finals have no classification rows; the second has no tool-call rows"
+  ],
+  "final_result": {
+    "recorded_after_opening": "2026-09-26T10:33:55Z",
+    "frozen_manifest_sha256": "fb3ab9c89e8d1cf2393764d65cdc7155f01aa25cf1093fca2a0f31a23f8c6263",
+    "note": "every field above this block is unchanged from the frozen file the second fresh final was opened with; score_final.py stopped at its tool-call difference (no tool-call rows), so the figures were computed from the same scored rows",
+    "task_macro_including_failures": {
+      "bobcat-1.1": 0.9427,
+      "r16": 0.9403,
+      "bobcat-1": 0.9359,
+      "zero-shot base": 0.8786,
+      "bobcat-flash-1.1": 0.9221
+    },
+    "tasks": {
+      "bobcat-1.1": {
+        "citation": 1.0,
+        "injection": 0.9691,
+        "routing": 0.9957,
+        "search": 0.806
+      },
+      "r16": {
+        "citation": 1.0,
+        "injection": 0.9636,
+        "routing": 0.9957,
+        "search": 0.802
+      },
+      "bobcat-1": {
+        "citation": 0.9903,
+        "injection": 0.9655,
+        "routing": 0.9957,
+        "search": 0.792
+      },
+      "zero-shot base": {
+        "citation": 0.932,
+        "injection": 0.86,
+        "routing": 0.9805,
+        "search": 0.742
+      },
+      "bobcat-flash-1.1": {
+        "citation": 1.0,
+        "injection": 0.9491,
+        "routing": 0.9935,
+        "search": 0.746
+      }
+    },
+    "bobcat-1.1_minus_base_95ci": [
+      0.0641,
+      0.0481,
+      0.0814
+    ],
+    "bobcat-1.1_minus_r16_95ci": [
+      0.0024,
+      -0.0025,
+      0.0077
+    ],
+    "bobcat-1.1_minus_bobcat-1_95ci": [
+      0.0068,
+      -0.0003,
+      0.015
+    ],
+    "flash_minus_bobcat-1.1_95ci": [
+      -0.0205,
+      -0.0304,
+      -0.0117
+    ],
+    "flash_minus_bobcat-1_95ci": [
+      -0.0137,
+      -0.0246,
+      -0.0026
+    ],
+    "calibrated_nll_ece": {
+      "bobcat-1.1": {
+        "nll": 0.334,
+        "ece": 0.0123
+      },
+      "r16": {
+        "nll": 0.3338,
+        "ece": 0.0116
+      },
+      "bobcat-1": {
+        "nll": 0.35,
+        "ece": 0.0167
+      },
+      "zero-shot base": {
+        "nll": 0.5449,
+        "ece": 0.0513
+      }
+    },
+    "failed_rows": 0,
+    "sensitivity_without_51_routing_rows": {
+      "b11": 0.9426,
+      "cmp": 0.9402,
+      "b1": 0.9357,
+      "base": 0.878,
+      "flash": 0.9219
+    }
+  },
+  "serving_builds": {
+    "nvfp4": {
+      "derived_from": "this adapter merged into the base (bobcat.student_merge, fp32 products, BF16 storage)",
+      "tool": "scripts/nvfp4_quantize.py (llm-compressor 0.14.0, NVFP4 W4A4, 256 dev prompts, fused GDN qkv/z scales shared)",
+      "files_sha256": {
+        "model.safetensors": "2ea6716e36673bc73995bc5e06bd3a032ed8be19f4fff8dd544ce9a40bb173c9",
+        "model_mtp.safetensors": "1d8268aa85ace093a561e3e7b63b9d390dac1cd55a90cd55b5ec509c3c9da9fe"
+      },
+      "size": "20 GB",
+      "dev_rows_not_used_for_calibration": {
+        "bf16_eval_path": {
+          "accuracy": 0.9328,
+          "task_macro": 0.9347,
+          "argmax_agreement_with_fp8": 0.9928,
+          "minus_fp8_95ci": [
+            -0.0021,
+            0.0028
+          ]
+        },
+        "fp8": {
+          "accuracy": 0.9325,
+          "task_macro": 0.935,
+          "argmax_agreement_with_fp8": null,
+          "minus_fp8_95ci": null
+        },
+        "nvfp4": {
+          "accuracy": 0.9325,
+          "task_macro": 0.9341,
+          "argmax_agreement_with_fp8": 0.9816,
+          "minus_fp8_95ci": [
+            -0.0045,
+            0.0047
+          ]
+        }
+      },
+      "status": "a different numerical artifact from the evaluated adapter; its own figures are in the report"
+    }
+  },
+  "public_copy": {
+    "derived_from_sha256": "d55042b1b8d3a0129d59a37a454debb07c15f2e6edda247f55ebcd83916e6214",
+    "changes": "storage locations, cost figures, host and instance details, and internal report and orchestration paths removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
+  }
+}

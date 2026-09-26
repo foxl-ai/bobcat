@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Korean-first typed decision models with auditable training and evaluation."
 requires-python = ">=3.12,<3.15"
 dependencies = [
-  "torch==2.12.1",
+  "torch==2.13.0",
   "numpy>=2,<3",
   "tokenizers>=0.21,<0.24",
   "scipy>=1.15,<2",
@@ -28,6 +28,10 @@ bobcat = "bobcat.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/bobcat"]
 
+[tool.uv]
+# setuptools is a transitive dependency (torch); < 83 has a moderate advisory.
+constraint-dependencies = ["setuptools>=83"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
@@ -38,3 +42,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Long lines kept as written: the Flash corpus manifest records this generator's SHA-256.
+"src/bobcat/flash_families.py" = ["E501"]

@@ -23,6 +23,11 @@ all-reduced by hand after each accumulation window. Evaluation writes runtime lo
   --eval-only   no update: evaluate the base model (zero LoRA) or a saved adapter;
   --head-only   freeze the backbone and any adapter and train only the pointer head, with the
                 backbone run without gradients (tests the pointer without LoRA competing).
+  --keep-order  read training rows in file order (a builder arranged them, e.g. so long rows
+                share a step across ranks); the default shuffles with --seed.
+  --save-every  rank 0 writes out/checkpoint/{adapter,state.pt} every N steps; `--init
+                out/checkpoint/adapter --resume out/checkpoint/state.pt` continues at the next
+                step with the same row cursor, optimizer moments and learning-rate schedule.
 """
 
 from __future__ import annotations
@@ -204,7 +209,8 @@ def fit(args, student, dist, world, rank, device, torch) -> None:
         {"params": [p for p in params if id(p) in head_ids], "lr": args.head_lr},
     ], weight_decay=0.0)
     rows = load_rows(args.train)
-    random.Random(args.seed).shuffle(rows)
+    if not args.keep_order:
+        random.Random(args.seed).shuffle(rows)
     per_step = args.accumulation * world
     steps = args.steps or math.ceil(len(rows) * args.epochs / per_step)
     warmup = max(1, round(steps * 0.03))
@@ -218,9 +224,21 @@ def fit(args, student, dist, world, rank, device, torch) -> None:
     generator = torch.Generator(device=device).manual_seed(args.seed * 7919 + rank)
     log = (args.out / "train-log.jsonl").open("a") if rank == 0 else None
     started, tokens = time.time(), 0
-    cursor = rank
+    names = [[name, list(p.shape)] for name, p in trainable_names(student)]
+    first = 0
+    if args.resume:
+        state = torch.load(args.resume, map_location=device, weights_only=False)
+        if state["names"] != names or state["steps"] != steps:
+            raise ValueError("The resume state belongs to a different adapter or schedule.")
+        optimizer.load_state_dict(state["optimizer"])
+        scheduler.load_state_dict(state["scheduler"])
+        first = state["step"] + 1
+        if log:
+            log.write(json.dumps({"resumed_at_step": first}) + "\n")
+    cursor = rank + first * per_step
+    step = first - 1
     student.model.train()
-    for step in range(steps):
+    for step in range(first, steps):
         tick = time.time()
         losses = []
         for _ in range(args.accumulation):
@@ -241,6 +259,10 @@ def fit(args, student, dist, world, rank, device, torch) -> None:
         optimizer.step()
         scheduler.step()
         optimizer.zero_grad(set_to_none=True)
+        if rank == 0 and args.save_every and (step + 1) % args.save_every == 0 \
+                and step + 1 < steps:
+            save_checkpoint(torch, student, optimizer, scheduler, args.out / "checkpoint",
+                            step=step, steps=steps, names=names)
         if log and (step % args.log_every == 0 or step == steps - 1):
             log.write(json.dumps({
                 "step": step, "steps": steps, "loss": sum(losses) / len(losses),
@@ -267,11 +289,39 @@ def fit(args, student, dist, world, rank, device, torch) -> None:
             "world_size": world, "accumulation": args.accumulation, "lr": args.lr,
             "head_lr": args.head_lr, "lora_rank": args.lora_rank, "seed": args.seed,
             "init": str(args.init) if args.init else None, "head_only": args.head_only,
+            "resumed_at_step": first or None, "keep_order": args.keep_order,
             "pointer_scale_init": args.pointer_scale_init,
             "pointer_scale_final": (float(student.head.scale) if student.head else None),
             "trainable_parameters": sum(p.numel() for p in params),
             "seconds": time.time() - started, "rank0_tokens": tokens,
         }, indent=2) + "\n")
+
+
+def trainable_names(student):
+    named = [(n, p) for n, p in student.model.named_parameters() if p.requires_grad]
+    if student.head is not None:
+        named += [(f"head.{n}", p) for n, p in student.head.named_parameters()]
+    return named
+
+
+def save_checkpoint(torch, student, optimizer, scheduler, folder: Path, *, step: int,
+                    steps: int, names: list) -> None:
+    """Adapter plus optimizer/schedule state, replaced atomically (a reader never sees a
+    half-written checkpoint)."""
+    partial = folder.with_name(folder.name + ".partial")
+    if partial.exists():
+        import shutil
+
+        shutil.rmtree(partial)
+    student.save(partial / "adapter")
+    torch.save({"optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
+                "step": step, "steps": steps, "names": names}, partial / "state.pt")
+    (partial / "step.json").write_text(json.dumps({"step": step, "steps": steps}) + "\n")
+    if folder.exists():
+        import shutil
+
+        shutil.rmtree(folder)
+    partial.rename(folder)
 
 
 def evaluate(args, student, dist, world, rank, torch) -> None:
@@ -330,7 +380,12 @@ def main():
     parser.add_argument("--eval-only", action="store_true")
     parser.add_argument("--head-only", action="store_true")
     parser.add_argument("--pointer-scale-init", type=float, default=0.0)
+    parser.add_argument("--keep-order", action="store_true")
+    parser.add_argument("--save-every", type=int, default=0)
+    parser.add_argument("--resume", type=Path, help="state.pt written by --save-every")
     args = parser.parse_args()
+    if args.resume and not args.init:
+        parser.error("--resume needs --init pointing at the checkpoint's adapter folder.")
     if args.eval_only == bool(args.train):
         parser.error("Give --train, or --eval-only without it.")
     if args.head_only and args.readout != "pointer":

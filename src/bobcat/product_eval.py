@@ -881,6 +881,96 @@ def build(sources_path: Path, root: Path, klue_root: Path, catalog_path: Path, o
     return manifest
 
 
+def fresh_final(sources_path: Path, root: Path, klue_root: Path, eval_dir: Path,
+                train_path: Path, catalog_path: Path | None, out: Path, *, seed: int,
+                limits: dict, earlier_finals: tuple[Path, ...] = ()) -> dict:
+    """A new sealed final from KLUE MRC contexts and WoS dialogues that no evaluation split
+    and no training build has used, plus tool-call situations from a catalog no split uses.
+    Evaluation wording (not the training templates) throughout. The previous final becomes
+    development data; this one opens only for a frozen release manifest."""
+    if out.exists():
+        raise ValueError("Outputs are immutable; choose a new directory.")
+    held, used = set(), set()
+    for split in SPLITS:
+        for line in (eval_dir / f"{split}.jsonl").open():
+            row = json.loads(line)
+            held.add(row["group_id"].removeprefix("product:"))
+            if "other_component" in row:
+                held.add(row["other_component"])
+    for line in train_path.open():
+        row = json.loads(line)
+        used.add(row["group_id"].removeprefix("product:"))
+        if "other_component" in row:
+            used.add(row["other_component"])
+    for path in earlier_finals:  # finals already built from the leftovers
+        for line in path.open():
+            row = json.loads(line)
+            held.add(row["group_id"].removeprefix("product:"))
+            if "other_component" in row:
+                held.add(row["other_component"])
+    source = json.loads(sources_path.read_text())
+    tables = load_sources(root, source)
+    pool = articles(tables, seed, held | used)
+    overlap = training_overlap(pool, training_sentences(klue_root))
+    left = [a for group in pool.values() for a in group if a.component not in overlap]
+    left.sort(key=lambda a: rank(a.component, seed, "fresh-final"))
+    fpool = {"final": left}
+    taken: set[str] = set()
+    rows = search_rows(fpool, seed, limits)
+    taken |= {r["group_id"].removeprefix("product:") for r in rows}
+    rows += title_rows(fpool, seed, limits, taken)
+    taken |= {r["group_id"].removeprefix("product:") for r in rows}
+    rows += citation_rows(fpool, seed, limits, taken)
+    rows += injection_rows(fpool, seed, limits, taken)
+    rows += topic_rows(fpool, seed, limits, taken)
+    rows += routing_rows(tables, seed, limits,
+                         assign=lambda c: None if c in held or c in used else "final")
+    if catalog_path is not None:
+        catalog = json.loads(catalog_path.read_text())
+        configs = Path(__file__).resolve().parents[2] / "configs"
+        earlier = {s["id"] for path in sorted(configs.glob("tool-situations-v*.json"))
+                   if path.resolve() != catalog_path.resolve()
+                   for s in json.loads(path.read_text())["situations"]}
+        if earlier & {s["id"] for s in catalog["situations"]}:
+            raise ValueError("The final's tool situations must be new.")
+        for row in tool_rows(catalog, seed):
+            rows.append({**row, "split": "final"})
+    reused = [r["id"] for r in rows if r["group_id"].removeprefix("product:") in held | used
+              or r.get("other_component") in held | used]
+    if reused:
+        raise ValueError(f"{len(reused)} fresh-final rows reuse earlier components.")
+    rows.sort(key=lambda r: (r["task"], r["family"], r["id"]))
+    checks = audit(rows)
+    out.mkdir(parents=True)
+    path = out / "final.jsonl"
+    with path.open("x") as stream:
+        for row in rows:
+            stream.write(json.dumps(row, ensure_ascii=False) + "\n")
+    verify_written(path)
+    files = {"final": {"path": path.name, "sha256": file_hash(path), "rows": len(rows)}}
+    manifest = {
+        "schema": SCHEMA, "status": "completed", "created_at": datetime.now(UTC).isoformat(),
+        "role": "fresh sealed final for Bobcat 1.1; the product-eval v2 final is development",
+        "seed": seed, "limits": limits, "generator_sha256": file_hash(Path(__file__)),
+        "sources": {"config_sha256": file_hash(sources_path), "revision": source["revision"],
+                    "files": source["files"],
+                    "tool_catalog_sha256": catalog_path and file_hash(catalog_path),
+                    "earlier_finals": {p.name: file_hash(p) for p in earlier_finals}},
+        "files": files, "final_sealed": True,
+        "final_rule": ("Do not evaluate final.jsonl until a release manifest binds checkpoint, "
+                       "tokenizer, calibration, precision and threshold. Any final result used "
+                       "to change settings turns this split into development."),
+        "excluded_components": {"evaluation_v2": len(held), "training_build": len(used),
+                                "training_sentence_overlap": len(overlap)},
+        "unused_mrc_contexts_available": len(left),
+        "audit": checks, "summary": summary(rows),
+        "human_review_completed": False, "teacher_outputs_used": False, "jev_outputs_used": False,
+        "content_sha256": json_hash({"final": files["final"]["sha256"]}),
+    }
+    atomic_json(out / "manifest.json", manifest)
+    return manifest
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -903,7 +993,34 @@ def main():
     trainer.add_argument("--seed", type=int, default=2026092503)
     trainer.add_argument("--scale", type=float, default=6.0,
                          help="multiplier on the evaluation limits")
+    fresh = sub.add_parser("fresh-final")
+    fresh.add_argument("--sources", type=Path, required=True)
+    fresh.add_argument("--root", type=Path, required=True)
+    fresh.add_argument("--klue-root", type=Path, required=True)
+    fresh.add_argument("--eval-dir", type=Path, required=True)
+    fresh.add_argument("--train", type=Path, required=True,
+                       help="the product training build (train-split train.jsonl)")
+    fresh.add_argument("--catalog", type=Path,
+                       default=Path("configs/tool-situations-v3-final.json"))
+    fresh.add_argument("--out", type=Path, required=True)
+    fresh.add_argument("--seed", type=int, default=2026092601)
+    fresh.add_argument("--scale", type=float, default=1.0,
+                       help="multiplier on the evaluation limits (the final gets 1/4)")
+    fresh.add_argument("--exclude-final", type=Path, action="append", default=[],
+                       help="an earlier fresh final whose components are excluded")
+    fresh.add_argument("--no-tools", action="store_true",
+                       help="no tool-call rows (every written catalog is already used)")
     args = parser.parse_args()
+    if args.command == "fresh-final":
+        limits = {k: round(v * args.scale) for k, v in DEFAULT_LIMITS.items()}
+        manifest = fresh_final(args.sources, args.root, args.klue_root, args.eval_dir,
+                               args.train, None if args.no_tools else args.catalog, args.out,
+                               seed=args.seed, limits=limits,
+                               earlier_finals=tuple(args.exclude_final))
+        print(json.dumps({k: manifest[k] for k in ("files", "excluded_components",
+                                                   "unused_mrc_contexts_available", "summary")},
+                         ensure_ascii=False, indent=2))
+        return
     if args.command == "train-split":
         limits = {k: round(v * args.scale) for k, v in DEFAULT_LIMITS.items()}
         manifest = training_split(args.sources, args.root, args.klue_root, args.eval_dir,

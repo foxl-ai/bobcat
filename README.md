@@ -11,7 +11,9 @@
 </p>
 
 <p align="center">
-  <a href="https://huggingface.co/sanghwa-na/bobcat-1">Model on Hugging Face</a> &nbsp;·&nbsp;
+  <a href="https://huggingface.co/sanghwa-na/bobcat-1.1">Bobcat 1.1</a> &nbsp;·&nbsp;
+  <a href="https://huggingface.co/sanghwa-na/bobcat-flash-1.1">Bobcat Flash 1.1</a> &nbsp;·&nbsp;
+  <a href="https://huggingface.co/sanghwa-na/bobcat-1">Bobcat 1</a> &nbsp;·&nbsp;
   <a href="https://foxl.ai/blog/bobcat-typed-decisions">Technical report</a> &nbsp;·&nbsp;
   <a href="paper/build/main.pdf">Paper (PDF)</a> &nbsp;·&nbsp;
   <a href="#quickstart">Quickstart</a>
@@ -19,7 +21,7 @@
 
 ---
 
-![Bobcat at a glance](release/hf/assets/bobcat-highlights.png)
+![Bobcat 1.1 at a glance](release/hf/bobcat-1.1/assets/bobcat-1.1-highlights.png)
 
 Bobcat reads a state (text or JSON), your questions and the answers you allow, and returns
 typed decisions your code can threshold. It reads the logits of the offered candidates at
@@ -27,24 +29,32 @@ the first answer position of one forward pass; the host builds a closed JSON rep
 your own names, and an independent validator refuses anything outside that contract. An
 answer can be wrong, but it cannot be malformed.
 
-Bobcat 1 is a rank-16 LoRA adapter for [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B)
-(Apache-2.0), released at [sanghwa-na/bobcat-1](https://huggingface.co/sanghwa-na/bobcat-1).
 The request and reply use the shapes of TypeSafe's published System One HTTP API, so the
 official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 
-| | Bobcat 1 | Reference |
-|---|---:|---|
-| Six-task decision evaluation, sealed final (1,607 decisions) | **94.6%** | 84.5% same base model, zero-shot |
-| Tool-call review, never trained on | **99.0%** | 79.2% same base model, zero-shot |
-| TypeSafe's published workflow examples, agreement (329 questions) | **91.8%** | Jev 90.9%, Claude Opus 5 92.4%, GPT-5.6 Sol 93.0% |
-| One decision (512 tokens, 8 candidates), p50, server-side | **50 ms** | one H100, FP8, vLLM |
+## Models
 
-The [model card](release/hf/README.md) and the technical report give every number with
-its conditions and limits, including the negative results.
+| Model | Adapter for | Sealed final (1,614 decisions) | TypeSafe workflow agreement, served | Median time per workflow case | One decision, p50 |
+|---|---|---:|---:|---:|---:|
+| [Bobcat 1.1](release/hf/bobcat-1.1/README.md) | Qwen3.8-27B, LoRA r16 | **94.27%** | 91.2% | 0.52-0.58 s (NVFP4) | 42.8 ms (NVFP4) |
+| [Bobcat Flash 1.1](release/hf/bobcat-flash-1.1/README.md) | Gemma 4 26B-A4B, LoRA r64 | 92.21% | 91.2% | **0.297 s** (FP8) | **24.8 ms** (FP8) |
+| [Bobcat 1](release/hf/README.md) | Qwen3.8-27B, LoRA r16 | 93.59% | 92.1% | 0.84 s (FP8) | 57.5 ms (FP8) |
+
+All three on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0: times per case are
+server-side over localhost HTTP, one decision is 512 tokens with 8 candidates measured in
+the vLLM engine. On TypeSafe's 20 published workflow examples (329 questions) Jev agrees
+with the reference on 90.9% at 0.42 s per case (TypeSafe's published client-side time);
+Jev was never called. Bobcat 1.1 cut the rate at which a wrong answer named inside the state
+wins from 39.6% (Bobcat 1) to 7.7%. Flash answers most questions itself and can hand the
+ones it is unsure about to Bobcat 1.1 in one server (`bobcat.route_server`).
+
+The model cards give every number with its conditions and limits, including the targets
+that were not met and the negative results.
 
 ## Quickstart
 
-On one Linux GPU host (tested: one L40S 48 GB with FP8, one H100 80 GB):
+On one Linux GPU host. The recipe was tested from a fresh clone with Bobcat 1 on one L40S
+48 GB (FP8) and one H100 80 GB; the 1.1 figures come from one RTX PRO 6000 96 GB.
 
 ```bash
 git clone https://github.com/foxl-ai/bobcat && cd bobcat
@@ -56,18 +66,20 @@ export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
 $PY -m bobcat.student_readout download --repo Qwen/Qwen3.8-27B \
   --revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --out base
-$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1', local_dir='adapter')"
+$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1', local_dir='adapter')"
 $PY -m bobcat.student_merge --model-dir base --adapter adapter --out model
 mkdir -p compiler && cp base/{tokenizer.json,tokenizer_config.json,chat_template.jinja,config.json,bobcat-download.json} compiler/
 
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model model \
-  --compiler-model compiler --quantization fp8 --temperature 1.1489 --name bobcat-1 \
+  --compiler-model compiler --quantization fp8 --temperature 1.2008 --name bobcat-1.1 \
   --max-num-seqs 128 --host 127.0.0.1 --port 8000 --local
 ```
 
 Then point the SDK at it: `TYPESAFE_BASE_URL=http://127.0.0.1:8000`,
-`TYPESAFE_DEFAULT_MODEL=bobcat-1`, any `TYPESAFE_API_KEY`. See the model card for a full
-example and for notes on running on AWS.
+`TYPESAFE_DEFAULT_MODEL=bobcat-1.1`, any `TYPESAFE_API_KEY`. For Bobcat 1 use
+`sanghwa-na/bobcat-1` with `--temperature 1.1489`; Bobcat Flash 1.1 has its own base,
+server settings and routing recipe in [its card](release/hf/bobcat-flash-1.1/README.md).
+The cards also cover running on AWS.
 
 ## Repository
 
@@ -75,12 +87,15 @@ example and for notes on running on AWS.
 |---|---|
 | `src/bobcat/protocol.py` | the closed request/response contract, limits and validator |
 | `src/bobcat/student_readout.py` | the compiler (single-token identifiers, piecewise encoding) and the first-position readout |
-| `src/bobcat/api_server.py` | the TypeSafe-compatible server (vLLM or transformers engine) |
-| `src/bobcat/student_train.py`, `student_merge.py` | LoRA training (cross-entropy, Brier, proper-score RL) and merging |
-| `src/bobcat/product_eval.py`, `korean_bench.py` | the six-task evaluation builder and the public benchmark sets |
-| `scripts/` | calibration, scoring, the TypeSafe workflow comparison, release staging |
+| `src/bobcat/api_server.py` | the TypeSafe-compatible server (vLLM or transformers engine), with the state tokenized once per request |
+| `src/bobcat/flash_server.py`, `route_server.py` | the Flash server, and one server running Flash with a fallback to Bobcat 1.1 |
+| `src/bobcat/student_train.py`, `student_merge.py` | LoRA training (cross-entropy, Brier, proper-score RL, resumable) and merging |
+| `src/bobcat/student_data_v11.py` | the Bobcat 1.1 mixture: injected-answer, insufficient-evidence and long-state counterfactuals |
+| `src/bobcat/flash_data.py`, `flash_teacher.py`, `flash_train.py` | the Flash corpus, teacher probabilities and distillation |
+| `src/bobcat/product_eval.py`, `korean_bench.py` | the six-task evaluation builder (including fresh finals) and the public benchmark sets |
+| `scripts/` | calibration, scoring, the TypeSafe workflow and SemIf comparisons, NVFP4 quantization, release staging |
 | `paper/` | the technical report in LaTeX, its figures and the built PDF |
-| `release/` | the release manifest, the model card and its figures |
+| `release/` | the release manifests, the model cards and their figures |
 | `configs/`, `tests/` | pinned data and model sources, and the test suite |
 
 ## Development
@@ -93,13 +108,15 @@ uv run ruff check src tests scripts
 
 ## License
 
-The code is released under the [Apache License 2.0](LICENSE). The Bobcat 1 adapter is
-released under Apache-2.0 as a derivative of Qwen3.8-27B. Datasets keep their own licenses;
-third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md) and [licenses/](licenses/).
+The code is released under the [Apache License 2.0](LICENSE). The Bobcat 1 and Bobcat 1.1
+adapters are released under Apache-2.0 as derivatives of Qwen3.8-27B, and the Bobcat Flash
+1.1 adapter under Apache-2.0 as a derivative of Gemma 4 26B-A4B-it (Apache-2.0). Datasets
+keep their own licenses; third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md) and
+[licenses/](licenses/).
 
-Bobcat is an independent project. It is not affiliated with or endorsed by TypeSafe AI or
-any other company named here; product names are their owners' trademarks and are used only
-to identify the models compared.
+Bobcat is an independent project. It is not affiliated with or endorsed by TypeSafe AI,
+Google, the Qwen team or any other company named here; product names are their owners'
+trademarks and are used only to identify the models compared.
 
 ## Citation
 

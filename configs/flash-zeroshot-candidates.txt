@@ -1,0 +1,11 @@
+# Bobcat Flash zero-shot screen (2026-09-26): repo revision (pinned, Apache-2.0).
+# Pure attention: Qwen3 1.7B/4B-2507/8B/30B-A3B-2507; sliding+global attention: Gemma 4;
+# Gated DeltaNet hybrids: Qwen3.5-4B, Qwen3.6-35B-A3B (re-measured with the piecewise compile).
+Qwen/Qwen3-4B-Instruct-2507 cdbee75f17c01a7cc42f958dc650907174af0554
+Qwen/Qwen3-1.7B 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+Qwen/Qwen3-8B b968826d9c46dd6066d109eabc6255188de91218
+Qwen/Qwen3-30B-A3B-Instruct-2507 0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe
+google/gemma-4-26B-A4B-it 4d7ae4984b7db7de8f8457170b3f1a419ee76d52
+google/gemma-4-E4B-it ee0ef6023621cff504d758262d4e04895a5af4a2
+Qwen/Qwen3.6-35B-A3B 995ad96eacd98c81ed38be0c5b274b04031597b0
+Qwen/Qwen3.5-4B 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
