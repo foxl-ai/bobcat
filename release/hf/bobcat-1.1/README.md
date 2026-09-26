@@ -107,15 +107,21 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 
 ## Quickstart: serve Bobcat 1.1 on one GPU
 
-This is the Bobcat 1 recipe (tested end to end from a fresh clone on one L40S 48 GB) with
-this adapter and its temperature. We have not repeated the fresh-install test for 1.1; the
-figures below were measured on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0.
+Tested end to end from a fresh clone, exactly as written below, on one RTX PRO 6000
+Blackwell 96 GB with a fresh Ubuntu 24.04 GPU image (NVIDIA driver 595) and local NVMe:
+about 10 seconds to install, 1.4 minutes to download the base, 2 minutes to merge and
+2.5-4 minutes until the server was ready. The adapter came from a local copy of this
+repository, so its download was not timed. Through that server the SDK example below
+answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 92.1% of
+329 questions (no failed request; the evaluation path also gives 92.1%) at 0.86 s per case
+in FP8. The other figures below were measured on the same GPU type with vLLM 0.30.0.
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
 git clone https://github.com/foxl-ai/bobcat && cd bobcat
 export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
 uv venv --python 3.12 .venv-serve
-uv pip install --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
+uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
@@ -131,7 +137,7 @@ mkdir -p compiler && cp base/{tokenizer.json,tokenizer_config.json,chat_template
 # 3. The typed-decision server (TypeSafe-compatible /v1/systemone and /v1/models)
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model model \
   --compiler-model compiler --quantization fp8 --temperature 1.2008 --name bobcat-1.1 \
-  --max-num-seqs 128 --host 127.0.0.1 --port 8000 --local
+  --release-date 2026-09-26 --max-num-seqs 128 --host 127.0.0.1 --port 8000 --local
 ```
 
 Then call it with the official SDK:
@@ -155,10 +161,15 @@ print(result.nouls["billing"].noul, result.choices["route"].choice)
 
 Notes:
 
+- `--no-config` keeps uv from applying this repository's development settings to the
+  serving environment: `pyproject.toml` constrains setuptools to >= 83, and vLLM 0.30.0
+  requires setuptools < 81.
 - `--temperature 1.2008` is the calibration temperature fitted for this adapter on a
   held-out calibration split; it never changes an argmax.
 - The served workflow timings below add `--schedule all --engine-arg
   max_num_batched_tokens=16384`, which schedule every question of a request together.
+  In FP8 on the fresh install this gave the same answers at 0.85 s per case; the 0.52-0.58 s
+  figures are NVFP4.
 - `--local` disables the shared secret the server otherwise requires; use it only on a
   loopback or private interface.
 - The server refuses inputs over its limits (128 questions, 255 candidates, 16,384 tokens

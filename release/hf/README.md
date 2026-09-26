@@ -88,13 +88,15 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 Tested end to end from a fresh clone on Linux with one NVIDIA L40S 48 GB (FP8): about 3.5
 minutes to download the base, 6.5 minutes to merge and 5.5 minutes until the server is ready.
 The same artifact was also measured on one H100 80 GB (FP8 and BF16) with vLLM 0.30.0. The
-adapter is merged into the base weights for serving.
+adapter is merged into the base weights for serving. The install lines (uv installer,
+`--no-config`) were updated afterwards and tested in this form with Bobcat 1.1.
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
 git clone https://github.com/foxl-ai/bobcat && cd bobcat
 export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
 uv venv --python 3.12 .venv-serve
-uv pip install --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
+uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
@@ -134,6 +136,9 @@ print(result.nouls["billing"].noul, result.choices["route"].choice)
 
 Notes:
 
+- `--no-config` keeps uv from applying this repository's development settings to the
+  serving environment: `pyproject.toml` constrains setuptools to >= 83, and vLLM 0.30.0
+  requires setuptools < 81.
 - `--local` disables the shared secret the server otherwise requires; use it only on a
   loopback or private interface.
 - `--temperature 1.1489` is the calibration temperature fitted for this adapter; it never

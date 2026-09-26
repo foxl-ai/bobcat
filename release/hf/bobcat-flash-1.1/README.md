@@ -82,15 +82,22 @@ its base URL.
 
 ## Quickstart: serve Flash on one GPU
 
-The figures on this card were measured on one RTX PRO 6000 Blackwell 96 GB with vLLM
-0.30.0 and FP8. We have not run a fresh-install test of this exact recipe; it is the
-Bobcat recipe with the Gemma base and the settings we served Flash with.
+Tested end to end from a fresh clone, exactly as written below, on one RTX PRO 6000
+Blackwell 96 GB with a fresh Ubuntu 24.04 GPU image (NVIDIA driver 595) and local NVMe:
+about 10 seconds to install, 1.4 minutes to download the base, 1.5 minutes to merge and
+2.5 minutes until the server was ready. The adapter came from a local copy of this
+repository, so its download was not timed. Through that server the SDK example below
+answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 90.9% and
+91.8% of 329 questions in two fresh installs (91.2% in the tables below; no failed request)
+at 0.28 s per case. The other figures on this card were measured on the same GPU type with
+vLLM 0.30.0 and FP8.
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
 git clone https://github.com/foxl-ai/bobcat && cd bobcat
 export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
 uv venv --python 3.12 .venv-serve
-uv pip install --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
+uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
@@ -130,6 +137,9 @@ print(result.nouls["billing"].noul, result.choices["route"].choice)
 
 Notes:
 
+- `--no-config` keeps uv from applying this repository's development settings to the
+  serving environment: `pyproject.toml` constrains setuptools to >= 83, and vLLM 0.30.0
+  requires setuptools < 81.
 - `--temperature 0.8912` is the calibration temperature fitted for this adapter on a
   held-out calibration split; it never changes an argmax.
 - `bobcat.api_server` with the same arguments serves Flash too; it tokenizes the state once
@@ -385,6 +395,11 @@ development and 89.1% against 91.2% on TypeSafe's workflows. Serve FP8.
 - **Multi-question requests.** Gemma 4's sliding-window layers keep vLLM's prefix cache from
   reusing a shared state exactly, so a request with many questions recomputes part of its
   state (about 1.6 times the request's tokens on a 37-state, 777-question benchmark).
+- **Near-ties move between server runs.** Two fresh installs of the served FP8 model
+  scored 90.9% and 91.8% on TypeSafe's 329 workflow questions: 6 top answers changed, each
+  with a top probability of 0.70 or less. Bobcat 1.1 in FP8 gave the same top answers in
+  four runs. Where an answer must be reproducible, send questions below Flash's 0.8
+  threshold to Bobcat 1.1, as `bobcat.route_server` does.
 - Insufficient evidence is as hard for Flash as for Bobcat (WANLI256 0.734). Give it an
   explicit "not stated" option.
 - The routing figures use the first Bobcat 1.1 candidate as the 27B model (see

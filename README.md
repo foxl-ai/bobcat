@@ -53,14 +53,16 @@ that were not met and the negative results.
 
 ## Quickstart
 
-On one Linux GPU host. The recipe was tested from a fresh clone with Bobcat 1 on one L40S
-48 GB (FP8) and one H100 80 GB; the 1.1 figures come from one RTX PRO 6000 96 GB.
+On one Linux GPU host. This recipe, and the Flash card's, were run exactly as written from a
+fresh clone on one RTX PRO 6000 96 GB with Bobcat 1.1 and Bobcat Flash 1.1; an earlier form
+was tested with Bobcat 1 on one L40S 48 GB (FP8) and one H100 80 GB.
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
 git clone https://github.com/foxl-ai/bobcat && cd bobcat
 export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
 uv venv --python 3.12 .venv-serve
-uv pip install --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
+uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
@@ -72,14 +74,17 @@ mkdir -p compiler && cp base/{tokenizer.json,tokenizer_config.json,chat_template
 
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model model \
   --compiler-model compiler --quantization fp8 --temperature 1.2008 --name bobcat-1.1 \
-  --max-num-seqs 128 --host 127.0.0.1 --port 8000 --local
+  --release-date 2026-09-26 --max-num-seqs 128 --host 127.0.0.1 --port 8000 --local
 ```
 
 Then point the SDK at it: `TYPESAFE_BASE_URL=http://127.0.0.1:8000`,
 `TYPESAFE_DEFAULT_MODEL=bobcat-1.1`, any `TYPESAFE_API_KEY`. For Bobcat 1 use
-`sanghwa-na/bobcat-1` with `--temperature 1.1489`; Bobcat Flash 1.1 has its own base,
-server settings and routing recipe in [its card](release/hf/bobcat-flash-1.1/README.md).
-The cards also cover running on AWS.
+`sanghwa-na/bobcat-1` with `--temperature 1.1489 --name bobcat-1 --release-date 2026-09-25`;
+Bobcat Flash 1.1 has its own base, server settings and routing recipe in
+[its card](release/hf/bobcat-flash-1.1/README.md).
+The cards also cover running on AWS. `--no-config` keeps uv from applying this
+repository's development constraint (setuptools >= 83; vLLM 0.30.0 needs < 81) to the
+serving environment.
 
 ## Repository
 
@@ -101,7 +106,7 @@ The cards also cover running on AWS.
 ## Development
 
 ```bash
-uv sync
+uv sync --all-extras   # pytest, ruff and the server packages are extras
 uv run python -m pytest
 uv run ruff check src tests scripts
 ```
