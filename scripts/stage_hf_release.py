@@ -1,4 +1,4 @@
-"""Stage the Hugging Face package of a Bobcat adapter release (never uploads).
+"""Stage the Hugging Face package of a Bobcat release (never uploads).
 
 Assembles exactly what the Hugging Face repository holds: the LoRA adapter, the model card,
 the public release manifest, the identifier list the compiler needs, the card's figures and
@@ -9,9 +9,15 @@ Face credentials in the environment, so staging can never turn into an upload by
 uploading is a separate, deliberate step.
 
 Releases (`--release`):
-  bobcat-1          release/hf/README.md, release/bobcat-1-manifest.json
-  bobcat-1.1        release/hf/bobcat-1.1/
-  bobcat-flash-1.1  release/hf/bobcat-flash-1.1/
+  bobcat-1.1               release/hf/bobcat-1.1/
+  bobcat-flash-1.1         release/hf/bobcat-flash-1.1/
+  bobcat-1.1-nvfp4         release/hf/bobcat-1.1-nvfp4/ (ready-to-serve weights)
+  bobcat-flash-1.1-merged  release/hf/bobcat-flash-1.1-merged/ (ready-to-serve weights)
+Weight packages (`--weights-dir`, `--compiler-dir`) hold a served checkpoint instead of an
+adapter: every weight file the release manifest hashes must match, the tokenizer files must
+match the manifest, receipts lose their local paths, and `compiler/` carries the base's pinned
+tokenizer, template, config and download receipt that the Bobcat compiler checks. LICENSE and
+NOTICE are added.
 For 1.1 and Flash 1.1 the card folder also holds `bobcat-release-manifest.json`, the public
 copy of the internal release manifest with storage locations, cost figures, host details and
 orchestration paths removed. On the development line, `--refresh-public-manifest` rewrites it
@@ -22,6 +28,8 @@ local paths before anything is written.
     python scripts/stage_hf_release.py --release bobcat-1.1 --adapter-dir DIR --out DIR
     python scripts/stage_hf_release.py --release bobcat-flash-1.1 --from-s3 s3://B/P/ --out DIR
     python scripts/stage_hf_release.py --release bobcat-1.1 --refresh-public-manifest
+    python scripts/stage_hf_release.py --release bobcat-1.1-nvfp4 --weights-dir DIR \
+        --compiler-dir BASE_DIR --out DIR
 """
 
 from __future__ import annotations
@@ -50,15 +58,16 @@ class Release:
     card: Path
     assets: Path
     internal_manifest: Path
-    adapter_hash_path: tuple[str, ...]
+    adapter_hash_path: tuple[str, ...] | None
     public_manifest: Path | None = None  # None: the internal manifest is already public
+    kind: str = "adapter"  # or "weights"
+    weight_hashes_path: tuple[str, ...] | None = None  # manifest dict {file: sha256}
+    base_model: str | None = None  # the card's base_model when it is not the manifest base
+    license_from: str = "repo"  # "compiler": the upstream LICENSE fetched with the compiler
+    source_label: str = ""  # replaces local paths in the weights' receipts
 
 
 RELEASES = {
-    "bobcat-1": Release(
-        "bobcat-1", "sanghwa-na/bobcat-1", ROOT / "release/hf/README.md",
-        ROOT / "release/hf/assets", ROOT / "release/bobcat-1-manifest.json",
-        ("adapter", "adapter_model_sha256")),
     "bobcat-1.1": Release(
         "bobcat-1.1", "sanghwa-na/bobcat-1.1", ROOT / "release/hf/bobcat-1.1/README.md",
         ROOT / "release/hf/bobcat-1.1/assets", ROOT / "release/bobcat-1.1-manifest.json",
@@ -71,7 +80,30 @@ RELEASES = {
         ROOT / "release/bobcat-flash-1.1-manifest.json",
         ("weights", "sha256", "adapter/adapter_model.safetensors"),
         ROOT / "release/hf/bobcat-flash-1.1/bobcat-release-manifest.json"),
+    "bobcat-1.1-nvfp4": Release(
+        "bobcat-1.1-nvfp4", "sanghwa-na/bobcat-1.1-nvfp4",
+        ROOT / "release/hf/bobcat-1.1-nvfp4/README.md", ROOT / "release/hf/bobcat-1.1-nvfp4/assets",
+        ROOT / "release/bobcat-1.1-manifest.json", None,
+        ROOT / "release/hf/bobcat-1.1/bobcat-release-manifest.json", kind="weights",
+        weight_hashes_path=("serving_builds", "nvfp4", "files_sha256"),
+        base_model="sanghwa-na/bobcat-1.1", license_from="compiler",
+        source_label="the Bobcat 1.1 adapter merged into Qwen/Qwen3.8-27B at revision "
+                     "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 (bobcat.student_merge, BF16)"),
+    "bobcat-flash-1.1-merged": Release(
+        "bobcat-flash-1.1-merged", "sanghwa-na/bobcat-flash-1.1-merged",
+        ROOT / "release/hf/bobcat-flash-1.1-merged/README.md",
+        ROOT / "release/hf/bobcat-flash-1.1-merged/assets",
+        ROOT / "release/bobcat-flash-1.1-manifest.json", None,
+        ROOT / "release/hf/bobcat-flash-1.1/bobcat-release-manifest.json", kind="weights",
+        weight_hashes_path=("serving_artifacts", "merged_bf16", "files_sha256"),
+        source_label="google/gemma-4-26B-A4B-it at revision "
+                     "4d7ae4984b7db7de8f8457170b3f1a419ee76d52"),
 }
+COMPILER_FILES = ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja", "config.json",
+                  "bobcat-download.json")
+TOKENIZER_FILES = ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja")
+SKIPPED_WEIGHT_FILES = {"README.md", ".gitattributes", "bobcat-download.json", "LICENSE"}
+RECEIPT_PATH_FIELDS = {"bobcat-nvfp4.json": "source_model", "bobcat-merge.json": "base"}
 
 # ---------------------------------------------------------------- public manifest
 
@@ -181,10 +213,11 @@ def front_matter(card: str) -> dict[str, str]:
 def check_card(release: Release, card: str, manifest: dict) -> None:
     meta = front_matter(card)
     base = manifest["base"]
-    if meta.get("base_model") != base["repo"]:
+    expected = release.base_model or base["repo"]
+    if meta.get("base_model") != expected:
         raise SystemExit("The card's base_model differs from the release manifest.")
     revision = meta.get("base_model_revision")
-    if revision is not None and revision != base["revision"]:
+    if revision is not None and (expected != base["repo"] or revision != base["revision"]):
         raise SystemExit("The card's base_model_revision differs from the release manifest.")
     for key in ("license", "pipeline_tag", "library_name"):
         if key not in meta:
@@ -242,13 +275,7 @@ def stage(release: Release, adapter_dir: Path, out: Path) -> dict:
     (out / "bobcat-release-manifest.json").write_text(manifest_text)
     if release.assets.exists():
         shutil.copytree(release.assets, out / "assets")
-    identifiers = json.loads(IDENTIFIERS.read_text())["identifiers"]
-    (out / "bobcat-identifiers.json").write_text(json.dumps(
-        {"glm_preferred_identifiers": identifiers,
-         "note": "Bobcat keeps these where they are single ordinary tokens of the base "
-                 "tokenizer, then extends with fixed Greek/Cyrillic/Hebrew/Latin-1/"
-                 "Armenian/Georgian letters (bobcat.student_readout.identifier_scheme)."},
-        ensure_ascii=False, indent=1) + "\n")
+    write_identifiers(out)
     files = {str(p.relative_to(out)): file_hash(p)
              for p in sorted(out.rglob("*")) if p.is_file()}
     (out / "SHA256SUMS.json").write_text(json.dumps(files, indent=1) + "\n")
@@ -256,15 +283,91 @@ def stage(release: Release, adapter_dir: Path, out: Path) -> dict:
             "files": len(files) + 1, "adapter_model_sha256": have, "uploaded": False}
 
 
+def stage_weights(release: Release, weights_dir: Path, compiler_dir: Path, out: Path) -> dict:
+    """A ready-to-serve checkpoint package (see the module docstring)."""
+    manifest, manifest_text = published_manifest(release)
+    card = release.card.read_text()
+    check_card(release, card, manifest)
+    for label, text, is_manifest in (("model card", card, False),
+                                     ("release manifest", manifest_text, True)):
+        hits = blocked(text, manifest=is_manifest)
+        if hits:
+            raise SystemExit(f"The {label} matches blocked patterns: {', '.join(hits)}")
+    expected = dig(manifest, release.weight_hashes_path)
+    if not expected:
+        raise SystemExit("The release manifest records no hashes for these weights.")
+    for name, digest in expected.items():
+        if not (weights_dir / name).is_file() or file_hash(weights_dir / name) != digest:
+            raise SystemExit(f"{name} does not match the release manifest.")
+    for name in TOKENIZER_FILES:
+        for folder in (weights_dir, compiler_dir):
+            if file_hash(folder / name) != manifest["tokenizer"][name]:
+                raise SystemExit(f"{folder.name}/{name} differs from the manifest's tokenizer.")
+    receipt = json.loads((compiler_dir / "bobcat-download.json").read_text())
+    if (receipt["repo"], receipt["revision"]) != (manifest["base"]["repo"],
+                                                  manifest["base"]["revision"]):
+        raise SystemExit("The compiler folder is not the manifest's pinned base.")
+    for name in COMPILER_FILES[:-1]:
+        if file_hash(compiler_dir / name) != receipt["files"][name]["sha256"]:
+            raise SystemExit(f"compiler {name} differs from its download receipt.")
+    out.mkdir(parents=True)
+    for path in sorted(weights_dir.iterdir()):
+        if not path.is_file() or path.name in SKIPPED_WEIGHT_FILES:
+            continue
+        if path.name in RECEIPT_PATH_FIELDS:
+            data = json.loads(path.read_text())
+            data[RECEIPT_PATH_FIELDS[path.name]] = release.source_label
+            text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+            if blocked(text, manifest=True):
+                raise SystemExit(f"{path.name} still holds host details after rewriting.")
+            (out / path.name).write_text(text)
+        else:
+            shutil.copy(path, out / path.name)
+    (out / "compiler").mkdir()
+    for name in COMPILER_FILES:
+        shutil.copy(compiler_dir / name, out / "compiler" / name)
+    if release.license_from == "compiler":
+        if file_hash(compiler_dir / "LICENSE") != receipt["files"]["LICENSE"]["sha256"]:
+            raise SystemExit("The upstream LICENSE differs from its download receipt.")
+        shutil.copy(compiler_dir / "LICENSE", out / "LICENSE")
+    else:
+        shutil.copy(ROOT / "LICENSE", out / "LICENSE")
+    shutil.copy(release.card.with_name("NOTICE"), out / "NOTICE")
+    (out / "README.md").write_text(card)
+    (out / "bobcat-release-manifest.json").write_text(manifest_text)
+    if release.assets.exists():
+        shutil.copytree(release.assets, out / "assets")
+    write_identifiers(out)
+    files = {str(p.relative_to(out)): file_hash(p)
+             for p in sorted(out.rglob("*")) if p.is_file()}
+    (out / "SHA256SUMS.json").write_text(json.dumps(files, indent=1) + "\n")
+    return {"release": release.name, "repo_id": release.repo_id, "staged": str(out),
+            "files": len(files) + 1, "weights_sha256": expected, "uploaded": False}
+
+
+def write_identifiers(out: Path) -> None:
+    identifiers = json.loads(IDENTIFIERS.read_text())["identifiers"]
+    (out / "bobcat-identifiers.json").write_text(json.dumps(
+        {"glm_preferred_identifiers": identifiers,
+         "note": "Bobcat keeps these where they are single ordinary tokens of the base "
+                 "tokenizer, then extends with fixed Greek/Cyrillic/Hebrew/Latin-1/"
+                 "Armenian/Georgian letters (bobcat.student_readout.identifier_scheme)."},
+        ensure_ascii=False, indent=1) + "\n")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--release", choices=sorted(RELEASES), default="bobcat-1")
+    parser.add_argument("--release", choices=sorted(RELEASES), required=True)
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--adapter-dir", type=Path,
                         help="folder with adapter_config.json and adapter_model.safetensors")
     source.add_argument("--from-s3", metavar="S3_URI",
                         help="s3://bucket/prefix/ holding the two adapter files")
+    source.add_argument("--weights-dir", type=Path,
+                        help="weight packages: the served checkpoint folder")
+    parser.add_argument("--compiler-dir", type=Path,
+                        help="weight packages: the pinned base download (receipt, tokenizer)")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--refresh-public-manifest", action="store_true",
                         help="rewrite the card folder's public manifest (development line)")
@@ -285,10 +388,15 @@ def main(argv: list[str] | None = None) -> None:
                           "sha256": file_hash(release.public_manifest)}))
         return
     refuse_credentials()
+    if args.out is not None and args.out.exists():
+        raise SystemExit("Choose a new output folder.")
+    if release.kind == "weights":
+        if args.out is None or args.weights_dir is None or args.compiler_dir is None:
+            parser.error("weight packages need --weights-dir, --compiler-dir and --out")
+        print(json.dumps(stage_weights(release, args.weights_dir, args.compiler_dir, args.out)))
+        return
     if args.out is None or (args.adapter_dir is None and args.from_s3 is None):
         parser.error("staging needs --out and one of --adapter-dir / --from-s3")
-    if args.out.exists():
-        raise SystemExit("Choose a new output folder.")
     download = None
     adapter_dir = args.adapter_dir
     if args.from_s3:

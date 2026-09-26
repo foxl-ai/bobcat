@@ -179,4 +179,89 @@ def test_committed_cards_and_manifests_are_publishable(name):
     shr.check_card(release, card, manifest)
     assert shr.blocked(card, manifest=False) == []
     assert shr.blocked(text, manifest=True) == []
-    assert len(shr.dig(manifest, release.adapter_hash_path)) == 64
+    if release.kind == "adapter":
+        assert len(shr.dig(manifest, release.adapter_hash_path)) == 64
+    else:
+        hashes = shr.dig(manifest, release.weight_hashes_path)
+        assert any(name.endswith(".safetensors") for name in hashes)
+        assert all(len(digest) == 64 for digest in hashes.values())
+        assert release.card.with_name("NOTICE").is_file()
+
+
+def write_weights(tmp_path: Path, release_manifest: dict) -> tuple[Path, Path]:
+    weights, base = tmp_path / "weights", tmp_path / "base"
+    for folder in (weights, base):
+        folder.mkdir()
+        for name in shr.TOKENIZER_FILES:
+            (folder / name).write_text(f"{name}\n")
+    (base / "config.json").write_text("{}\n")
+    (weights / "config.json").write_text('{"quantization_config": {}}\n')
+    (weights / "model.safetensors").write_bytes(b"w" * 64)
+    (weights / "README.md").write_text("upstream card")
+    (weights / "bobcat-merge.json").write_text(json.dumps({"base": "/mnt/nvme/base", "rank": 64}))
+    (base / "LICENSE").write_text("Apache License\n")
+    digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()  # noqa: E731
+    (base / "bobcat-download.json").write_text(json.dumps({
+        "repo": "org/base", "revision": "a" * 40,
+        "files": {n: {"status": "ok", "sha256": digest(base / n)}
+                  for n in (*shr.TOKENIZER_FILES, "config.json", "LICENSE")}}))
+    release_manifest["tokenizer"] = {n: digest(weights / n) for n in shr.TOKENIZER_FILES}
+    release_manifest["serving_builds"] = {"nvfp4": {"files_sha256": {
+        "model.safetensors": digest(weights / "model.safetensors")}}}
+    return weights, base
+
+
+def weights_release(tmp_path: Path, internal: dict) -> shr.Release:
+    path = tmp_path / "release/bobcat-x-manifest.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(internal))
+    folder = tmp_path / "release/hf/bobcat-x-nvfp4"
+    folder.mkdir(parents=True)
+    (folder / "README.md").write_text(CARD.format(revision="a" * 40).replace(
+        "base_model: org/base\nbase_model_revision: " + "a" * 40,
+        "base_model: sanghwa-na/bobcat-x\nbase_model_relation: quantized").replace(
+        "sanghwa-na/bobcat-x.", "sanghwa-na/bobcat-x-nvfp4."))
+    (folder / "NOTICE").write_text("notice\n")
+    public = tmp_path / "release/hf/bobcat-x/bobcat-release-manifest.json"
+    public.parent.mkdir(parents=True, exist_ok=True)
+    release = shr.Release("bobcat-x-nvfp4", "sanghwa-na/bobcat-x-nvfp4", folder / "README.md",
+                          folder / "assets", path, None, public, kind="weights",
+                          weight_hashes_path=("serving_builds", "nvfp4", "files_sha256"),
+                          base_model="sanghwa-na/bobcat-x", license_from="compiler",
+                          source_label="the merged adapter")
+    public.write_text(shr.expected_public(release))
+    return release
+
+
+def test_stage_weights_writes_a_servable_package(tmp_path):
+    internal = json.loads(json.dumps(INTERNAL))
+    weights, base = write_weights(tmp_path, internal)
+    release = weights_release(tmp_path, internal)
+    result = shr.stage_weights(release, weights, base, tmp_path / "out")
+    out = tmp_path / "out"
+    names = {str(p.relative_to(out)) for p in out.rglob("*") if p.is_file()}
+    assert names == {"config.json", "model.safetensors", "bobcat-merge.json", *shr.TOKENIZER_FILES,
+                     *(f"compiler/{n}" for n in shr.COMPILER_FILES), "LICENSE", "NOTICE",
+                     "README.md", "bobcat-release-manifest.json", "bobcat-identifiers.json",
+                     "SHA256SUMS.json"}
+    assert json.loads((out / "bobcat-merge.json").read_text())["base"] == "the merged adapter"
+    assert (out / "LICENSE").read_text() == "Apache License\n"
+    assert result["uploaded"] is False and set(result["weights_sha256"]) == {"model.safetensors"}
+
+
+def test_stage_weights_refuses_changed_weights_or_tokenizer(tmp_path):
+    for case in ("weights", "tokenizer"):
+        root = tmp_path / case
+        root.mkdir()
+        internal = json.loads(json.dumps(INTERNAL))
+        weights, base = write_weights(root, internal)
+        release = weights_release(root, internal)
+        if case == "weights":
+            (weights / "model.safetensors").write_bytes(b"x")
+            expected = "model.safetensors does not match"
+        else:
+            (base / "tokenizer.json").write_text("other\n")
+            expected = "tokenizer"
+        with pytest.raises(SystemExit, match=expected):
+            shr.stage_weights(release, weights, base, root / "out")
+        assert not (root / "out").exists()

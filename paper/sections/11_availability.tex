@@ -2,11 +2,16 @@
 \label{sec:availability}
 
 \paragraph{Weights.}
-The LoRA adapter (rank 16 on Qwen3.8-27B at the pinned revision), its SHA-256, the release
-manifest, the identifier list the compiler needs and a model card are released on Hugging
-Face at \url{https://huggingface.co/sanghwa-na/bobcat-1} under Apache-2.0. The compiler,
-server, training and evaluation code are at \url{https://github.com/foxl-ai/bobcat} under
-Apache-2.0. The derived evaluation data are not redistributed.
+The Bobcat 1 adapter evaluated in this report is not distributed. Its successors are released
+on Hugging Face under Apache-2.0, each with its SHA-256 sums, release manifest, the identifier
+list the compiler needs and a model card that reports its own evaluation: Bobcat 1.1, a new
+rank-16 adapter on the same Qwen3.8-27B revision
+(\url{https://huggingface.co/sanghwa-na/bobcat-1.1}; ready-to-serve NVFP4 weights at
+\url{https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4}), and Bobcat Flash 1.1, a distilled
+adapter on Gemma 4 26B-A4B-it (\url{https://huggingface.co/sanghwa-na/bobcat-flash-1.1};
+merged weights at \url{https://huggingface.co/sanghwa-na/bobcat-flash-1.1-merged}). The
+compiler, server, training and evaluation code are at \url{https://github.com/foxl-ai/bobcat}
+under Apache-2.0. The derived evaluation data are not redistributed.
 
 \paragraph{Internal API.}
 The hosted API at \url{https://api.foxl.ai/bobcat} runs since 2026-09-25 and is restricted

@@ -85,6 +85,41 @@ its base URL.
 
 ## Quickstart: serve Flash on one GPU
 
+Two ways, with the same environment and the same server:
+
+- **Option A: ready-to-serve weights.**
+  [sanghwa-na/bobcat-flash-1.1-merged](https://huggingface.co/sanghwa-na/bobcat-flash-1.1-merged)
+  is this adapter already merged into the pinned base in BF16, byte-identical to the merge
+  behind this card's served figures; vLLM quantizes it to FP8 at load. Nothing to merge.
+- **Option B: this adapter, merged on your machine** from the base download.
+
+### Option A: ready-to-serve merged weights
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
+git clone https://github.com/foxl-ai/bobcat && cd bobcat
+export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
+uv venv --python 3.12 .venv-serve
+uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
+  "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
+export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
+
+$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-flash-1.1-merged', local_dir='bobcat-flash-1.1-merged')"
+VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.flash_server --engine vllm --model bobcat-flash-1.1-merged \
+  --compiler-model bobcat-flash-1.1-merged/compiler --quantization fp8 --temperature 0.8912 \
+  --name bobcat-flash-1.1 --release-date 2026-09-26 --max-num-seqs 256 --max-model-len 32832 \
+  --schedule all --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
+```
+
+Load-tested from the staged repository folder on one RTX PRO 6000 (the Hugging Face download
+line runs once the repository is public): the server answered `/health`, the SDK example below
+answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 91.2% of
+329 questions at 0.28 s per case. The merged weights give the adapter path's answer on 314 of
+319 sampled development decisions, the rest near-ties; details are on the
+[merged card](https://huggingface.co/sanghwa-na/bobcat-flash-1.1-merged).
+
+### Option B: merge this adapter
+
 Tested end to end from a fresh clone, exactly as written below, on one RTX PRO 6000
 Blackwell 96 GB with a fresh Ubuntu 24.04 GPU image (NVIDIA driver 595) and local NVMe:
 about 10 seconds to install, 1.4 minutes to download the base, 1.5 minutes to merge and

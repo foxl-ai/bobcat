@@ -36,6 +36,7 @@ import time
 import uuid
 from array import array
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from bobcat.protocol import (
@@ -321,17 +322,37 @@ def validation_error(message: str, loc=("body",)) -> dict:
     return {"detail": [{"loc": list(loc), "msg": message, "type": "value_error"}]}
 
 
+@dataclass(frozen=True)
+class Served:
+    """One more model a server answers (`create_api(also=...)`): its own engine, compiler
+    (so its own compile, limits and billed token count) and calibration temperature, and
+    the aliases that name it. An engine may be shared with another served model."""
+    engine: object
+    compiler: object
+    temperature: float
+    aliases: frozenset[str] = field(default_factory=frozenset)
+
+
 def create_api(engine, compiler, *, model_name: str, aliases: set[str], temperature: float,
-               models: list[dict], edge_secret: str | None, max_inflight: int = 256):
+               models: list[dict], edge_secret: str | None, max_inflight: int = 256,
+               also: dict[str, Served] | None = None):
+    """`also` adds models answered by the same process (one name each, plus aliases); a
+    request is compiled, scored, billed and named by the model it asks for, and every other
+    name is a 422. Without `also` the server is exactly the one-model server."""
     from fastapi import FastAPI, Request
     from fastapi.responses import JSONResponse
 
     app = FastAPI(title="Bobcat", version="1.0", docs_url=None, redoc_url=None,
                   openapi_url=None)
-    temperatures = {kind: temperature for kind in ("choice", "noul", "score")}
-    accepted = aliases | {model_name}
+    served = {model_name: Served(engine, compiler, temperature, frozenset(aliases))}
+    served.update(also or {})
+    names: dict[str, str] = {}
+    for name, entry in served.items():
+        for alias in {name, *entry.aliases}:
+            if alias in names:
+                raise ValueError(f"Model name {alias!r} is given twice.")
+            names[alias] = name
     state = {"inflight": 0}
-    decide = getattr(engine, "decide", None)  # bobcat.route_server.RoutedEngine
 
     def reply(status, body, request_id, extra=None):
         headers = {"x-request-id": request_id, **(extra or {})}
@@ -356,12 +377,14 @@ def create_api(engine, compiler, *, model_name: str, aliases: set[str], temperat
         try:
             payload = decode_request(b"".join(chunks))
             state_value, questions = parse_request(payload)
-            if payload["model"] not in accepted:
+            if payload["model"] not in names:
                 return reply(422, validation_error(
                     f"Unknown model {payload['model']!r}; see GET /v1/models.",
                     ("body", "model")), request_id)
+            name = names[payload["model"]]
+            target = served[name]
             contract = copy.deepcopy(questions)
-            compiled = [compiler.compile(state_value, q) for q in questions]
+            compiled = [target.compiler.compile(state_value, q) for q in questions]
         except RequestLimitError as error:
             return reply(422, validation_error(
                 f"{error} Inputs are never truncated."), request_id)
@@ -375,19 +398,22 @@ def create_api(engine, compiler, *, model_name: str, aliases: set[str], temperat
         state["inflight"] += 1
         started = time.perf_counter()
         try:
-            billed = billed_tokens(compiler, state_value, sequences)
+            billed = billed_tokens(target.compiler, state_value, sequences)
+            decide = getattr(target.engine, "decide", None)  # route_server.RoutedEngine
             if decide is not None:
                 # A routing engine returns numbers only (scores, one temperature per
                 # question, processed tokens, header values); the host still builds and
                 # checks the closed reply from the request's own names.
                 scores, per_question, processed, extra = await decide(
                     state_value, questions, sequences, options, request.headers)
-                result = build_response(model_name, contract, scores, per_question, billed)
+                result = build_response(name, contract, scores, per_question, billed)
             else:
-                scores = await engine.logits(sequences, options, common_prefix(sequences))
-                result = response(model_name, contract, scores, temperatures, billed)
+                scores = await target.engine.logits(sequences, options,
+                                                    common_prefix(sequences))
+                temperatures = {kind: target.temperature for kind in ("choice", "noul", "score")}
+                result = response(name, contract, scores, temperatures, billed)
                 processed, extra = sum(map(len, sequences)), {}
-            validate_response(result, contract, model=model_name)
+            validate_response(result, contract, model=name)
         except Exception:
             # Never forward engine text, tracebacks or partial answers.
             return reply(500, {"detail": "The decision could not be produced."}, request_id)
@@ -413,7 +439,10 @@ def create_api(engine, compiler, *, model_name: str, aliases: set[str], temperat
 
     @app.get("/health")
     async def health():
-        return {"model": model_name, "engine": engine.name, "inflight": state["inflight"]}
+        body = {"model": model_name, "engine": engine.name, "inflight": state["inflight"]}
+        if also:
+            body["models"] = {name: entry.engine.name for name, entry in served.items()}
+        return body
 
     return app
 

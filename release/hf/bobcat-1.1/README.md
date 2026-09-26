@@ -40,9 +40,9 @@ JSON reply from your own names. An answer can be wrong, but it cannot be malform
 
 This repository, `sanghwa-na/bobcat-1.1`, holds the **Bobcat 1.1 LoRA adapter** for
 [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) (Apache-2.0) at revision
-`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It uses the same base, compiler and readout
-as [Bobcat 1](https://huggingface.co/sanghwa-na/bobcat-1) and drops into the same server;
-Bobcat 1 is unchanged. The compiler, server and evaluation code are at
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It uses the same base, compiler, readout and
+server as Bobcat 1, the earlier model it succeeds, which is not distributed; Bobcat 1 figures
+on this card are for comparison only. The compiler, server and evaluation code are at
 [github.com/foxl-ai/bobcat](https://github.com/foxl-ai/bobcat). A faster tier built from
 this model is [Bobcat Flash 1.1](https://huggingface.co/sanghwa-na/bobcat-flash-1.1).
 
@@ -106,6 +106,42 @@ The request and reply use the shapes of TypeSafe's published System One HTTP API
 official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 
 ## Quickstart: serve Bobcat 1.1 on one GPU
+
+Two ways, with the same environment and the same server:
+
+- **Option A: ready-to-serve weights.**
+  [sanghwa-na/bobcat-1.1-nvfp4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) is the
+  exact NVFP4 checkpoint behind this card's latency figures, for NVIDIA Blackwell GPUs (FP4
+  tensor cores). Nothing to merge.
+- **Option B: this adapter, merged on your machine.** Any GPU that runs vLLM's FP8 (for example
+  L40S, H100 or RTX PRO 6000); it takes the base download and a two-minute merge.
+
+### Option A: ready-to-serve NVFP4 weights
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
+git clone https://github.com/foxl-ai/bobcat && cd bobcat
+export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
+uv venv --python 3.12 .venv-serve
+uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
+  "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
+export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
+
+$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1-nvfp4', local_dir='bobcat-1.1-nvfp4')"
+VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model bobcat-1.1-nvfp4 \
+  --compiler-model bobcat-1.1-nvfp4/compiler --quantization none --temperature 1.2008 \
+  --name bobcat-1.1 --release-date 2026-09-26 --max-num-seqs 128 --schedule all \
+  --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
+```
+
+Load-tested from the staged repository folder on one RTX PRO 6000 (the Hugging Face download
+line runs once the repository is public): the server answered `/health`, the SDK example below
+answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 90.9% of
+329 questions at 0.61 s per case (the measured NVFP4 runs: 91.2%, 0.52-0.58 s; NVFP4 moves
+near-ties between runs). Details are on the
+[NVFP4 card](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4).
+
+### Option B: merge this adapter
 
 Tested end to end from a fresh clone, exactly as written below, on one RTX PRO 6000
 Blackwell 96 GB with a fresh Ubuntu 24.04 GPU image (NVIDIA driver 595) and local NVMe:

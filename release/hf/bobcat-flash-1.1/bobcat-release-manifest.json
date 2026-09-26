@@ -1385,10 +1385,46 @@
       "trade_off": "the rule sends every question longer than 2048 Flash tokens to Bobcat 1.1: on TypeSafe 20 Flash answers 21.5% of the questions (82.8% without the rule), so long-state workflows run at Bobcat cost; short dev traffic is unchanged (Flash 84.0%).",
       "status": "recommended routing rule for the Flash -> Bobcat 1.1 route server (quality tier); Flash alone is unchanged",
       "server_source_note": "sha256 of the shipped route_server.py (default --max-flash-tokens 2048). The measurements ran an earlier revision of the same change whose default was off, started with --max-flash-tokens 2048; the rule code was the same."
+    },
+    "merged_bf16": {
+      "added_at": "2026-09-26T18:40:00Z",
+      "note": "Additive ready-to-serve checkpoint of the frozen adapter above (to be published as sanghwa-na/bobcat-flash-1.1-merged). The adapter, base revision, tokenizer and every frozen field are unchanged (sha256 of this manifest without serving_artifacts: 88056ce0..., as bound by the final-opening record). No sealed final was opened; Jev was not called.",
+      "derived_from": {
+        "adapter_model_sha256": "2304bd8e9d5c11a0a2362dc5dc6dd927b1339cd8760612835ebf9b52e4899ca3",
+        "base": {
+          "repo": "google/gemma-4-26B-A4B-it",
+          "revision": "4d7ae4984b7db7de8f8457170b3f1a419ee76d52"
+        }
+      },
+      "merge": "bobcat.student_merge in the serving environment (vLLM 0.30.0, torch 2.13.0): each of the 235 adapted weights becomes bf16(W + (alpha/r) B A), alpha/r = 2.0, with the product and sum in float32; every other tensor and file of the base is copied",
+      "dtype": "bfloat16",
+      "files_sha256": {
+        "model-00001-of-00002.safetensors": "6847aa860e793d33c308683308efc6815ea420604d2d805abab8a416acfd14a7",
+        "model-00002-of-00002.safetensors": "d72e43850d618d452c6ceabf0c38f29c030bdb7e31e2a6a2149820edcf5bb72a",
+        "model.safetensors.index.json": "907826a6e46ff454272bd6db1fee629d5531a2303be22986d825a0871d7dc7a7",
+        "config.json": "ed0c1eb3633de771906e9ba004a44cc5635bcc06ee2062077c3d2e88a50707d3"
+      },
+      "identical_to_served_merge": true,
+      "identical_to_served_merge_note": "the shard hashes equal serving_artifacts.nvfp4.derived_from.merged_shards_sha256, the merge behind the FP8 serving figures and the NVFP4 study",
+      "serving": "vLLM 0.30.0 loads it with --quantization fp8 (online dynamic FP8), as measured; see serving_config_recommended",
+      "equivalence_to_adapter_path": {
+        "sample": "every 10th row of the compiled product-eval v2 dev split (319 decisions: search 86, citation 55, document screening 55, routing 55, classification 50, tool call 18)",
+        "paths": "BF16 base + unmerged LoRA (bobcat.flash_train --eval-only --init adapter) vs this checkpoint (same code, no adapter), one RTX PRO 6000, HF transformers 5.17.0",
+        "argmax_agreement": 0.9843,
+        "changed_answers": 5,
+        "changed_answers_note": "all five are search near-ties (top two within 0.08 on the adapter path)",
+        "accuracy_adapter_path": 0.9122,
+        "accuracy_merged": 0.9122,
+        "mean_max_probability_gap_at_T": 0.0056,
+        "max_probability_gap_at_T": 0.1708,
+        "temperature": 0.8911980656311957,
+        "same_host_adapter_vs_release_logits_argmax_agreement": 0.9906
+      },
+      "status": "ready-to-serve weights; the served (FP8) figures of this manifest are this checkpoint's"
     }
   },
   "public_copy": {
-    "derived_from_sha256": "6c67527ee300ef6cc9a42256323f8f9d9a3ffe1edffda1ed3b692f596afedafb",
+    "derived_from_sha256": "d4e906958d3ad49726b3c8dd1b196fdc2689f4879e7440e4a8de2e00c2c6185e",
     "changes": "storage locations, cost figures, host and instance details, and internal report and orchestration paths removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
   }
 }

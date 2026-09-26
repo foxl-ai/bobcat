@@ -13,7 +13,6 @@
 <p align="center">
   <a href="https://huggingface.co/sanghwa-na/bobcat-1.1">Bobcat 1.1</a> &nbsp;·&nbsp;
   <a href="https://huggingface.co/sanghwa-na/bobcat-flash-1.1">Bobcat Flash 1.1</a> &nbsp;·&nbsp;
-  <a href="https://huggingface.co/sanghwa-na/bobcat-1">Bobcat 1</a> &nbsp;·&nbsp;
   <a href="https://foxl.ai/blog/bobcat-typed-decisions">Technical report</a> &nbsp;·&nbsp;
   <a href="paper/build/main.pdf">Paper (PDF)</a> &nbsp;·&nbsp;
   <a href="#quickstart">Quickstart</a>
@@ -38,7 +37,7 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 |---|---|---:|---:|---:|---:|
 | [Bobcat 1.1](release/hf/bobcat-1.1/README.md) | Qwen3.8-27B, LoRA r16 | **94.27%** | 91.2% | 0.52-0.58 s (NVFP4) | 42.8 ms (NVFP4) |
 | [Bobcat Flash 1.1](release/hf/bobcat-flash-1.1/README.md) | Gemma 4 26B-A4B, LoRA r64 | 92.21% | 91.2% | **0.297 s** (FP8) | **24.8 ms** (FP8) |
-| [Bobcat 1](release/hf/README.md) | Qwen3.8-27B, LoRA r16 | 93.59% | 92.1% | 0.84 s (FP8) | 57.5 ms (FP8) |
+| Bobcat 1 (earlier model, for comparison; not distributed) | Qwen3.8-27B, LoRA r16 | 93.59% | 92.1% | 0.84 s (FP8) | 57.5 ms (FP8) |
 
 All three on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0: times per case are
 server-side over localhost HTTP, one decision is 512 tokens with 8 candidates measured in
@@ -49,8 +48,12 @@ wins from 39.6% (Bobcat 1) to 7.8%. Flash answers most questions itself; in one 
 (`bobcat.route_server`) it hands the ones it is unsure about, and every question longer than
 2,048 Flash tokens with its state, to Bobcat 1.1.
 
-The model cards give every number with its conditions and limits, including the targets
-that were not met and the negative results.
+Bobcat 1.1 and Bobcat Flash 1.1 come as LoRA adapters and as ready-to-serve weights:
+[sanghwa-na/bobcat-1.1-nvfp4](release/hf/bobcat-1.1-nvfp4/README.md), the NVFP4 checkpoint
+behind the 1.1 figures (Blackwell GPUs), and
+[sanghwa-na/bobcat-flash-1.1-merged](release/hf/bobcat-flash-1.1-merged/README.md), Flash
+merged in BF16 and served in FP8. The model cards give every number with its conditions and
+limits, including the targets that were not met and the negative results.
 
 ## Quickstart
 
@@ -79,8 +82,7 @@ VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model mod
 ```
 
 Then point the SDK at it: `TYPESAFE_BASE_URL=http://127.0.0.1:8000`,
-`TYPESAFE_DEFAULT_MODEL=bobcat-1.1`, any `TYPESAFE_API_KEY`. For Bobcat 1 use
-`sanghwa-na/bobcat-1` with `--temperature 1.1489 --name bobcat-1 --release-date 2026-09-25`;
+`TYPESAFE_DEFAULT_MODEL=bobcat-1.1`, any `TYPESAFE_API_KEY`.
 Bobcat Flash 1.1 has its own base, server settings and routing recipe in
 [its card](release/hf/bobcat-flash-1.1/README.md).
 The cards also cover running on AWS. `--no-config` keeps uv from applying this
@@ -114,9 +116,10 @@ uv run ruff check src tests scripts
 
 ## License
 
-The code is released under the [Apache License 2.0](LICENSE). The Bobcat 1 and Bobcat 1.1
-adapters are released under Apache-2.0 as derivatives of Qwen3.8-27B, and the Bobcat Flash
-1.1 adapter under Apache-2.0 as a derivative of Gemma 4 26B-A4B-it (Apache-2.0). Datasets
+The code is released under the [Apache License 2.0](LICENSE). The Bobcat 1.1 adapter and its
+NVFP4 checkpoint are released under Apache-2.0 as derivatives of Qwen3.8-27B, and the Bobcat
+Flash 1.1 adapter and its merged checkpoint under Apache-2.0 as derivatives of Gemma 4
+26B-A4B-it (Apache-2.0). Datasets
 keep their own licenses; third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md) and
 [licenses/](licenses/).
 

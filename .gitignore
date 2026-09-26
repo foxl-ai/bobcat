@@ -67,6 +67,7 @@ scripts/*
 !scripts/score_final.py
 !scripts/sdk_compat_check.py
 !scripts/stage_hf_release.py
+!scripts/hf_publish.py
 !scripts/typesafe_workflow_eval.py
 !scripts/summarize_student_zero_shot.py
 !scripts/survey_student_candidates.py
@@ -111,3 +112,8 @@ tests/test_spot_interruption_guard.py
 tests/test_stage_fixed_spot_successor.py
 tests/test_student_stage.py
 tests/test_training_cost_update.py
+
+# The Bobcat 1 Hugging Face repository stays private (owner decision 2026-09-26):
+# its card and release manifest are not part of the public tree.
+release/hf/README.md
+release/bobcat-1-manifest.json
