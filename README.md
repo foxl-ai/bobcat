@@ -5,6 +5,11 @@
 <h1 align="center">Bobcat</h1>
 
 <p align="center">
+  <img src="assets/readme/bobcat-demo.gif" width="640" alt="Bobcat Flash choosing an octopus's arm reaches, skin and ink many times a second in a live 3D reef, with each answer and the live decision rate on screen" /><br />
+  <sub>Bobcat Flash steering an octopus live: 256 typed decisions/s, 54 ms p50 server-side (40 pre-registered live runs; the clip shows its own session's figures).</sub>
+</p>
+
+<p align="center">
   <strong>A typed-decision model.</strong><br />
   State in, typed decisions out: Choice, Noul and Score, with a probability for every answer you name.<br />
   No generated text, no per-task fine-tuning.

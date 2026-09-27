@@ -48,6 +48,10 @@ most questions on its own and can hand the ones it is unsure about to
 [Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) in the same server. The compiler, servers and evaluation code are at
 [github.com/foxl-ai/bobcat](https://github.com/foxl-ai/bobcat).
 
+![Bobcat Flash choosing an octopus's arm reaches, skin and ink many times a second in a live 3D reef, with each answer and the live decision rate on screen](assets/bobcat-demo.gif)
+
+*Bobcat Flash steering an octopus live: 256 typed decisions/s, 54 ms p50 server-side (40 pre-registered live runs; the clip shows its own session's figures).*
+
 ![Bobcat Flash 1.1 at a glance](assets/bobcat-flash-1.1-highlights.png)
 
 ## Highlights

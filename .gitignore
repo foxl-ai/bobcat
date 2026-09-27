@@ -116,4 +116,5 @@ tests/test_training_cost_update.py
 # being revised.
 release/*.json
 release/hf/*.md
+release/hf/assets/
 paper/
