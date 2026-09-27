@@ -1,7 +1,7 @@
 """Bobcat Flash distillation corpus and compiled inputs (2026-09-26).
 
 `build` writes one component-disjoint row set from
-  mixture    the Bobcat 1 training mixture (gold; product, policy, public), unchanged;
+  mixture    the 27B student's base training mixture (gold; product, policy, public), unchanged;
   expanded   extra prepared public decisions (gold), sampled per task by a row hash, at most
              two rows per component, never a row the mixture already has;
   policy     extra policy-transfer questions (gold, exact interpreter);
@@ -10,7 +10,7 @@
   generated  games and workflow checks (`flash_families`; gold from the generator rule, or
              teacher-only for semantic families).
 Every row whose text keys meet any evaluation split is dropped, and the tool-call review
-task never appears. Teacher (Bobcat 1) probabilities are added later by `flash_teacher`;
+task never appears. Teacher probabilities are added later by `flash_teacher`;
 gold stays gold. `compile` turns rows into token IDs for one tokenizer (piecewise compile,
 the serving contract) in parallel, keeping the row ID so any tokenizer's rows align with the
 teacher's logits.
@@ -405,7 +405,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     b = sub.add_parser("build")
-    b.add_argument("--mixture", type=Path, required=True, help="Bobcat 1 mixture folder")
+    b.add_argument("--mixture", type=Path, required=True, help="base training mixture folder")
     b.add_argument("--expanded", type=Path, required=True)
     b.add_argument("--policy", type=Path, required=True)
     b.add_argument("--eval", type=Path, action="append", required=True,

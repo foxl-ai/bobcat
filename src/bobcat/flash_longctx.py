@@ -5,7 +5,7 @@ Flash 1.1 loses accuracy as unrelated text fills the state (dev: -5.3 pt at 8K, 
 This builds the continuation data of the pre-registered arm
 (.aws-local/flashlc-20260926-preregistration.json), mirroring the Bobcat 1.1 long-context rows:
 
-  build        padded copies of Flash corpus rows from the Bobcat 1 mixture
+  build        padded copies of Flash corpus rows from the teacher's training mixture
                (`bobcat.student_data_v11.long_copy`: the original state unchanged; padding
                from OTHER training components only, KLUE MRC training contexts for Korean,
                BoolQ / HelpSteer2 for English; training padding keys and layouts, never the
@@ -57,7 +57,7 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 def replay_rows(rows: list[dict], count: int, seed: int, exclude: set[str]) -> list[dict]:
-    """Half from the Bobcat 1 mixture rows, half from the rest of the corpus, each a seeded
+    """Half from the teacher training-mixture rows, half from the rest of the corpus, each a seeded
     uniform sample (so the corpus proportions are kept within each half)."""
     halves = ([r for r in rows if r.get("flash_source") == MIXTURE and r["id"] not in exclude],
               [r for r in rows if r.get("flash_source") != MIXTURE and r["id"] not in exclude])

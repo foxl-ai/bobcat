@@ -106,7 +106,7 @@ def build_requests(rows: list[dict], kind: str, payloads: dict | None = None) ->
                 "request_id": f"r{len(requests)}", "kind": kind,
                 "rows": {f"q{i}": {"id": row_id, "option_ids": option_ids}
                          for i, (row_id, _, option_ids) in enumerate(part)},
-                "request": {"model": "bobcat-1", "state": group["state"],
+                "request": {"model": "bobcat-1.1", "state": group["state"],
                             "questions": questions},
             })
     return requests
@@ -146,7 +146,7 @@ def predictions(requests: list[dict], responses: list[dict]) -> list[dict]:
                          "option_logits": [math.log(max(p, 1e-12)) for p in probabilities],
                          "status": "distribution", "request_id": request["request_id"],
                          "request_ms": response["client_ms"],
-                         "model": "bobcat-1 (served FP8, one L40S)"})
+                         "model": "bobcat-1.1 (served FP8, one L40S)"})
     return rows
 
 

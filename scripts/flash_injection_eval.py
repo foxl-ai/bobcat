@@ -3,7 +3,7 @@
 Posts every `suite == "injection"` case of the 2026-09-25 stress suite (`cases.jsonl`) to a
 running server, checks each reply with the independent wire audit
 (`output_contract_audit.inspect_reply`) and summarizes with `bobcat.stress.summarize`, the same
-measures the Bobcat 1 / 1.1 reports use (attack success, accuracy by variant). Each case is
+measures the Bobcat reports use (attack success, accuracy by variant). Each case is
 sent once; nothing is tuned. The edge secret comes from BOBCAT_EDGE_SECRET.
 """
 

@@ -3,9 +3,9 @@
   monitor  accuracy on held-out monitor rows (gold where it exists) by task, language and
            source, plus agreement with the teacher (argmax match, mean KL(teacher||student)
            at the teacher temperature) on every row, gold or teacher-only.
-  cascade  offline Flash -> Bobcat 1 routing on dev: questions whose input features are out
+  cascade  offline Flash -> 27B-model routing on dev: questions whose input features are out
            of the Flash training distribution (script, length, candidate count) or whose
-           calibrated Flash confidence is below a threshold go to Bobcat 1. Thresholds are
+           calibrated Flash confidence is below a threshold go to the 27B model. Thresholds are
            chosen on calibration and applied to dev; reports coverage, accuracy and the
            share of prefill compute that stays on Flash.
 """
@@ -104,12 +104,12 @@ def input_features(request_row: dict) -> dict:
 def cascade(flash_dev: Path, flash_cal: Path, big_dev: Path, rows_dev: Path, rows_cal: Path,
             t_flash: float, t_big: float, out: Path, max_candidates: int,
             flash_cost: float) -> dict:
-    """Offline routing study; `flash_cost` = Flash prefill cost relative to Bobcat 1 per token."""
+    """Offline routing study; `flash_cost` = Flash prefill cost per token relative to the 27B."""
     def load_scored(path):
         return {r["id"]: r for r in read(path)}
 
     fdev, fcal = load_scored(flash_dev), load_scored(flash_cal)
-    # Bobcat 1 evaluation-path logits ({id, logits}); targets come from the scored Flash rows.
+    # 27B-model evaluation-path logits ({id, logits}); targets come from the scored Flash rows.
     bdev = {}
     for r in read(big_dev):
         if r["id"] in fdev:
@@ -162,7 +162,7 @@ def cascade(flash_dev: Path, flash_cal: Path, big_dev: Path, rows_dev: Path, row
               "bobcat1_only_macro": sum(sum(v) / len(v) for v in big_only.values())
               / max(1, len(big_only)),
               "ood_rule": f"known-script share < 0.5 or candidates > {max_candidates}",
-              "note": "relative_compute counts a routed question as Flash + Bobcat 1 prefill; "
+              "note": "relative_compute counts a routed question as Flash + 27B-model prefill; "
                       "thresholds listed for calibration, dev shown for each"}
     out.write_text(json.dumps(report, indent=1) + "\n")
     return report

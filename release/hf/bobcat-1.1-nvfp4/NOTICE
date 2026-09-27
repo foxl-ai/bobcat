@@ -1,9 +1,9 @@
 Bobcat 1.1 NVFP4 (sanghwa-na/bobcat-1.1-nvfp4)
 Copyright 2026 The Bobcat Authors
 
-This checkpoint is the Bobcat 1.1 LoRA adapter (sanghwa-na/bobcat-1.1) merged into
-Qwen3.8-27B (Qwen/Qwen3.8-27B, revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0, by the
-Qwen team) and quantized to NVFP4 with llm-compressor 0.14.0.
+This checkpoint is Bobcat 1.1 (sanghwa-na/bobcat-1.1: the Bobcat 1.1 LoRA adapter merged into
+Qwen3.8-27B, Qwen/Qwen3.8-27B at revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0, by the Qwen
+team) quantized to NVFP4 with llm-compressor 0.14.0.
 
 Qwen3.8-27B is licensed under the Apache License, Version 2.0. Its LICENSE file is included
 here unchanged as LICENSE, and this derivative is released under the same license. The

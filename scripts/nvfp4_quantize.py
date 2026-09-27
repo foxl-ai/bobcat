@@ -1,4 +1,4 @@
-"""NVFP4 (W4A4) quantization of the merged Bobcat 1 checkpoint with llm-compressor.
+"""NVFP4 (W4A4) quantization of a merged Bobcat checkpoint with llm-compressor.
 
 Blackwell GPUs (RTX PRO 6000, B200/B300) have FP4 tensor cores; NVFP4 stores weights in
 4-bit E2M1 with an FP8 scale per 16 values and quantizes activations the same way at run

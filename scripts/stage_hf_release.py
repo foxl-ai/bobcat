@@ -8,25 +8,23 @@ revision instead of the local path it was trained against. It refuses to run wit
 Face credentials in the environment, so staging can never turn into an upload by accident;
 uploading is a separate, deliberate step.
 
-Releases (`--release`):
-  bobcat-1.1               release/hf/bobcat-1.1/
-  bobcat-flash-1.1         release/hf/bobcat-flash-1.1/
-  bobcat-1.1-nvfp4         release/hf/bobcat-1.1-nvfp4/ (ready-to-serve weights)
-  bobcat-flash-1.1-merged  release/hf/bobcat-flash-1.1-merged/ (ready-to-serve weights)
-Weight packages (`--weights-dir`, `--compiler-dir`) hold a served checkpoint instead of an
-adapter: every weight file the release manifest hashes must match, the tokenizer files must
-match the manifest, receipts lose their local paths, and `compiler/` carries the base's pinned
-tokenizer, template, config and download receipt that the Bobcat compiler checks. LICENSE and
+Releases (`--release`), all ready-to-serve checkpoints:
+  bobcat-1.1         release/hf/bobcat-1.1/ (BF16, the adapter merged into its base)
+  bobcat-1.1-nvfp4   release/hf/bobcat-1.1-nvfp4/ (NVFP4 build of the same weights)
+  bobcat-flash-1.1   release/hf/bobcat-flash-1.1/ (BF16, the adapter merged into its base)
+Weight packages (`--weights-dir`, `--compiler-dir`) hold a served checkpoint: every weight
+file the release manifest hashes must match, the tokenizer files must match the manifest,
+receipts lose their local paths, and `compiler/` carries the base's pinned tokenizer,
+template, config and download receipt that the Bobcat compiler checks. LICENSE and
 NOTICE are added.
-For 1.1 and Flash 1.1 the card folder also holds `bobcat-release-manifest.json`, the public
-copy of the internal release manifest with storage locations, cost figures, host details and
-orchestration paths removed. On the development line, `--refresh-public-manifest` rewrites it
-from the internal manifest, and staging refuses when the two have drifted apart. The card and
+The 1.1 and Flash 1.1 card folders also hold `bobcat-release-manifest.json`, the public copy
+of the internal release manifest with storage locations, cost figures, host details,
+orchestration paths and comparisons with other models removed. On the development line,
+`--refresh-public-manifest` rewrites it from the internal manifest, and staging refuses when
+the two have drifted apart. The card and
 the public manifest are scanned for storage URIs, cloud regions, instance ids, prices and
 local paths before anything is written.
 
-    python scripts/stage_hf_release.py --release bobcat-1.1 --adapter-dir DIR --out DIR
-    python scripts/stage_hf_release.py --release bobcat-flash-1.1 --from-s3 s3://B/P/ --out DIR
     python scripts/stage_hf_release.py --release bobcat-1.1 --refresh-public-manifest
     python scripts/stage_hf_release.py --release bobcat-1.1-nvfp4 --weights-dir DIR \
         --compiler-dir BASE_DIR --out DIR
@@ -70,16 +68,11 @@ class Release:
 RELEASES = {
     "bobcat-1.1": Release(
         "bobcat-1.1", "sanghwa-na/bobcat-1.1", ROOT / "release/hf/bobcat-1.1/README.md",
-        ROOT / "release/hf/bobcat-1.1/assets", ROOT / "release/bobcat-1.1-manifest.json",
-        ("adapter", "adapter_model_sha256"),
-        ROOT / "release/hf/bobcat-1.1/bobcat-release-manifest.json"),
-    "bobcat-flash-1.1": Release(
-        "bobcat-flash-1.1", "sanghwa-na/bobcat-flash-1.1",
-        ROOT / "release/hf/bobcat-flash-1.1/README.md",
-        ROOT / "release/hf/bobcat-flash-1.1/assets",
-        ROOT / "release/bobcat-flash-1.1-manifest.json",
-        ("weights", "sha256", "adapter/adapter_model.safetensors"),
-        ROOT / "release/hf/bobcat-flash-1.1/bobcat-release-manifest.json"),
+        ROOT / "release/hf/bobcat-1.1/assets", ROOT / "release/bobcat-1.1-manifest.json", None,
+        ROOT / "release/hf/bobcat-1.1/bobcat-release-manifest.json", kind="weights",
+        weight_hashes_path=("serving_builds", "merged_bf16", "files_sha256"),
+        license_from="compiler",
+        source_label="Qwen/Qwen3.8-27B at revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"),
     "bobcat-1.1-nvfp4": Release(
         "bobcat-1.1-nvfp4", "sanghwa-na/bobcat-1.1-nvfp4",
         ROOT / "release/hf/bobcat-1.1-nvfp4/README.md", ROOT / "release/hf/bobcat-1.1-nvfp4/assets",
@@ -89,10 +82,10 @@ RELEASES = {
         base_model="sanghwa-na/bobcat-1.1", license_from="compiler",
         source_label="the Bobcat 1.1 adapter merged into Qwen/Qwen3.8-27B at revision "
                      "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 (bobcat.student_merge, BF16)"),
-    "bobcat-flash-1.1-merged": Release(
-        "bobcat-flash-1.1-merged", "sanghwa-na/bobcat-flash-1.1-merged",
-        ROOT / "release/hf/bobcat-flash-1.1-merged/README.md",
-        ROOT / "release/hf/bobcat-flash-1.1-merged/assets",
+    "bobcat-flash-1.1": Release(
+        "bobcat-flash-1.1", "sanghwa-na/bobcat-flash-1.1",
+        ROOT / "release/hf/bobcat-flash-1.1/README.md",
+        ROOT / "release/hf/bobcat-flash-1.1/assets",
         ROOT / "release/bobcat-flash-1.1-manifest.json", None,
         ROOT / "release/hf/bobcat-flash-1.1/bobcat-release-manifest.json", kind="weights",
         weight_hashes_path=("serving_artifacts", "merged_bf16", "files_sha256"),
@@ -105,18 +98,32 @@ TOKENIZER_FILES = ("tokenizer.json", "tokenizer_config.json", "chat_template.jin
 # Never copied from a weights folder: upstream cards and receipts, and the files the stager
 # itself writes (so a staged package can be restaged from its own weights).
 SKIPPED_WEIGHT_FILES = {"README.md", ".gitattributes", "bobcat-download.json", "LICENSE",
-                        "NOTICE", "SHA256SUMS.json", "bobcat-release-manifest.json",
+                        "crc32.txt", "NOTICE", "SHA256SUMS.json", "bobcat-release-manifest.json",
                         "bobcat-identifiers.json"}
 RECEIPT_PATH_FIELDS = {"bobcat-nvfp4.json": "source_model", "bobcat-merge.json": "base"}
 
 # ---------------------------------------------------------------- public manifest
 
-DROP_KEYS = {"s3", "cost", "cost_estimate", "git_head", "gpu_memory_nvidia_smi", "report"}
+DROP_KEYS = {"s3", "cost", "cost_estimate", "git_head", "gpu_memory_nvidia_smi", "report",
+             "comparison"}
+# Public materials compare each model with its untrained base and Jev's published figures
+# only (owner decision 2026-09-26): keys naming the earlier model's results are dropped, and a
+# key holding a teacher's provenance is renamed.
+EARLIER_MODEL = re.compile(r"Bobcat\s1(?![.\d])|bobcat-?[1](?![.\d])")
+KEY_RENAMES = {"teacher_bobcat1": "teacher"}
 DROP_KEY_PREFIXES = ("usd", "infra/")
 REWRITES = (
     (re.compile(r"infra/\w+/nvfp4_quantize\.py"), "scripts/nvfp4_quantize.py"),
     (re.compile(r"\s*\((?:g7e|g6e|p5|p5e|p5en|p6-b200|p6-b300)\.[0-9a-z]+\)"), ""),
     (re.compile(r"\.aws-local/[\w.-]+(?: \(internal\))?"), "an internal file"),
+    (re.compile(r"bobcat-[1]: Qwen3\.8-27B \+ release LoRA"), "Qwen3.8-27B + Bobcat LoRA"),
+    (re.compile(r"bobcat1_mixture"), "teacher_training_mixture"),
+    (re.compile(r";\s*Bobcat\s1 stays unchanged"), ""),
+    (re.compile(r"was used by Bobcat\s1 training"), "was used by an earlier training build"),
+    (re.compile(r"\s+and vs Bobcat\s1(?![.\d])"), ""),
+    (re.compile(r"Flash corpus / Bobcat\s1 mixture 51"), "the Flash corpus 51"),
+    (re.compile(r"\s*\(Bobcat\s1 39/85\)"), " (untrained base 58/85)"),
+    (re.compile(r"is unchanged\sfrom the frozen file"), "is identical to the frozen file"),
 )
 # Named so a hit can be reported without echoing the text around it.
 BLOCKED = {
@@ -131,6 +138,7 @@ BLOCKED = {
     "credential": r"AKIA[0-9A-Z]{16}|hf_[A-Za-z0-9]{30,}|gh[pousr]_[A-Za-z0-9]{30,}|"
                   r"sk-[A-Za-z0-9]{20,}|fxb_[0-9A-Za-z]{32}|BEGIN [A-Z ]*PRIVATE KEY",
     "private-email": r"[A-Za-z0-9._%+-]+@(?:gmail|naver|amazon)\.com",
+    "earlier-model": EARLIER_MODEL.pattern,
 }
 # Instance types are allowed in a card (its "Running on AWS" how-to) but not in a manifest.
 MANIFEST_ONLY = {"instance-type": r"\b(?:g7e|g6e|g6|g5|p4d|p5|p5en|p6-b200|p6-b300)\.\d*x?large\b"}
@@ -146,8 +154,9 @@ def public_manifest(internal: dict, internal_sha256: str) -> dict:
 
     def clean(value):
         if isinstance(value, dict):
-            return {k: clean(v) for k, v in value.items()
-                    if k not in DROP_KEYS and not k.startswith(DROP_KEY_PREFIXES)}
+            return {KEY_RENAMES.get(k, k): clean(v) for k, v in value.items()
+                    if k not in DROP_KEYS and not k.startswith(DROP_KEY_PREFIXES)
+                    and (k in KEY_RENAMES or not EARLIER_MODEL.search(k))}
         if isinstance(value, list):
             return [clean(v) for v in value]
         if isinstance(value, str):
@@ -158,8 +167,9 @@ def public_manifest(internal: dict, internal_sha256: str) -> dict:
     out = clean(internal)
     out["public_copy"] = {
         "derived_from_sha256": internal_sha256,
-        "changes": "storage locations, cost figures, host and instance details, and internal "
-                   "report and orchestration paths removed; the NVFP4 quantizer named by its "
+        "changes": "storage locations, cost figures, host and instance details, internal "
+                   "report and orchestration paths, and results of models other than this "
+                   "release and its untrained base removed; the NVFP4 quantizer named by its "
                    "public path, scripts/nvfp4_quantize.py; nothing else changed",
     }
     return out
@@ -287,6 +297,15 @@ def stage(release: Release, adapter_dir: Path, out: Path) -> dict:
             "files": len(files) + 1, "adapter_model_sha256": have, "uploaded": False}
 
 
+def link_or_copy(source: Path, target: Path) -> None:
+    """A hard link where the file system allows it (checkpoints are tens of GB), else a copy.
+    The hashes are checked before and recorded after, so either gives the same package."""
+    try:
+        os.link(source, target)
+    except OSError:
+        shutil.copy(source, target)
+
+
 def stage_weights(release: Release, weights_dir: Path, compiler_dir: Path, out: Path) -> dict:
     """A ready-to-serve checkpoint package (see the module docstring)."""
     manifest, manifest_text = published_manifest(release)
@@ -326,7 +345,7 @@ def stage_weights(release: Release, weights_dir: Path, compiler_dir: Path, out: 
                 raise SystemExit(f"{path.name} still holds host details after rewriting.")
             (out / path.name).write_text(text)
         else:
-            shutil.copy(path, out / path.name)
+            link_or_copy(path, out / path.name)
     (out / "compiler").mkdir()
     for name in COMPILER_FILES:
         shutil.copy(compiler_dir / name, out / "compiler" / name)

@@ -2,16 +2,15 @@
 license: apache-2.0
 base_model: google/gemma-4-26B-A4B-it
 base_model_revision: 4d7ae4984b7db7de8f8457170b3f1a419ee76d52
-base_model_relation: adapter
-library_name: peft
+base_model_relation: finetune
+library_name: transformers
 language:
 - en
 - ko
 pipeline_tag: zero-shot-classification
 tags:
-- lora
-- peft
 - typed-decisions
+- vllm
 - calibration
 - distillation
 - classification
@@ -40,13 +39,13 @@ reads the logits of the offered candidates at the first answer position of one f
 pass, and the host builds a closed JSON reply from your own names. An answer can be wrong,
 but it cannot be malformed.
 
-This repository, `sanghwa-na/bobcat-flash-1.1`, holds the **Bobcat Flash 1.1 LoRA adapter**
-for [google/gemma-4-26B-A4B-it](https://huggingface.co/google/gemma-4-26B-A4B-it)
-(Apache-2.0) at revision `4d7ae4984b7db7de8f8457170b3f1a419ee76d52`: a sparse
-mixture-of-experts model with about 4B active parameters per token. Flash was distilled
-from the 27B Bobcat models. It answers most questions on its own and can hand the ones it
-is unsure about to [Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) in the same
-server. The compiler, servers and evaluation code are at
+This repository, `sanghwa-na/bobcat-flash-1.1`, holds **Bobcat Flash 1.1 as ready-to-serve
+BF16 weights**: a rank-64 LoRA distilled from 27B Bobcat teachers onto
+[google/gemma-4-26B-A4B-it](https://huggingface.co/google/gemma-4-26B-A4B-it) (Apache-2.0) at
+revision `4d7ae4984b7db7de8f8457170b3f1a419ee76d52`, a sparse mixture-of-experts model with
+about 4B active parameters per token, merged into the base. vLLM serves it in FP8. It answers
+most questions on its own and can hand the ones it is unsure about to
+[Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) in the same server. The compiler, servers and evaluation code are at
 [github.com/foxl-ai/bobcat](https://github.com/foxl-ai/bobcat).
 
 ![Bobcat Flash 1.1 at a glance](assets/bobcat-flash-1.1-highlights.png)
@@ -56,19 +55,20 @@ server. The compiler, servers and evaluation code are at
 | | Bobcat Flash 1.1 | Reference |
 |---|---:|---|
 | Median time per TypeSafe workflow case, client-side over HTTPS (cold server) | **0.25 s** same datacenter; **0.42 s** from another region | Jev 0.42 s (TypeSafe's published client-side time) |
-| Same, server-side over localhost | **0.297 s** | Bobcat 1.1 0.52-0.58 s (NVFP4) |
-| One decision (512 tokens, 8 candidates), p50 | **24.8 ms** engine; **27 ms** client-side, same datacenter | one RTX PRO 6000 Blackwell, FP8, vLLM; Bobcat 1.1 42.8 ms engine (NVFP4) |
+| Same, server-side over localhost | **0.297 s** | one RTX PRO 6000 Blackwell, FP8 |
+| One decision (512 tokens, 8 candidates), p50 | **24.8 ms** engine; **27 ms** client-side, same datacenter | one RTX PRO 6000 Blackwell, FP8, vLLM |
 | TypeSafe's published workflow examples: agreement with the reference (329 questions) | **91.2%** | Jev 90.9%, Claude Opus 5 92.4%, GPT-5.6 Sol 93.0% |
 | SemIf's 102 aligned TypeSafe rows: modal agreement | **0.896** | Jev 0.883 |
-| Sealed final, four tasks (1,614 decisions, opened once) | **92.21%** | Bobcat 1.1 94.27% (-2.1 pt [-3.0, -1.2]); Bobcat 1 93.59% |
-| Six-task development evaluation (3,188 decisions) | **92.07%** | Bobcat 1.1 93.69%; same base zero-shot 86.6% |
-| Wrong answer named inside the state wins | **9.7%** | Bobcat 1 38.6%, same server setup |
+| Six-task development evaluation (3,188 decisions) | **92.07%** | same base zero-shot 86.6% (+5.4 pt [+3.7, +7.2]) |
+| Sealed final, four tasks (1,614 decisions, opened once) | **92.21%** | the base was not run on this split |
+| Wrong answer named inside the state wins (300 questions x 3 attacks) | **9.7%** | served FP8; the base was not run on this test |
 | Routed server, development split (Flash first; unsure, out-of-range and over-2,048-token questions to Bobcat 1.1) | **93.15%**, 84.0% answered by Flash | Bobcat 1.1 alone 93.54% |
 | Same, states padded to 8K / 16K / 30K tokens | **equal to Bobcat 1.1 alone** (92.0 / 91.3 / 92.7%) | Flash alone -7.3 pt at 30K |
 
 Jev, Opus 5 and Sol figures are TypeSafe's own published answers and times; Jev was never
-called. Flash is less accurate than Bobcat 1.1, most of all on search passage selection and
-long states, which the routed server sends to Bobcat 1.1; see
+called. The same-base baseline is untrained Gemma 4 26B-A4B-it with the same compiler and
+readout. Flash is weakest on search passage selection and long states; the routed server
+sends long, out-of-range and unsure questions to Bobcat 1.1. See
 [Limitations](#limitations-and-risks).
 
 ## What it does
@@ -85,15 +85,12 @@ its base URL.
 
 ## Quickstart: serve Flash on one GPU
 
-Two ways, with the same environment and the same server:
-
-- **Option A: ready-to-serve weights.**
-  [sanghwa-na/bobcat-flash-1.1-merged](https://huggingface.co/sanghwa-na/bobcat-flash-1.1-merged)
-  is this adapter already merged into the pinned base in BF16, byte-identical to the merge
-  behind this card's served figures; vLLM quantizes it to FP8 at load. Nothing to merge.
-- **Option B: this adapter, merged on your machine** from the base download.
-
-### Option A: ready-to-serve merged weights
+The staged files of this repository were load-tested on one RTX PRO 6000 Blackwell 96 GB
+with vLLM 0.30.0 by the commands below (the download line runs once the repository is
+public): `vllm serve` came up and listed the model; the Bobcat server answered `/health`, the
+SDK example below answered `payments`, and TypeSafe's 20 workflow cases agreed with the
+reference on 91.2% of 329 questions (no failed request) at 0.28 s per case. The other figures
+on this card were measured on the same GPU type with vLLM 0.30.0 and FP8.
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
@@ -104,54 +101,13 @@ uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi 
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
-$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-flash-1.1-merged', local_dir='bobcat-flash-1.1-merged')"
-VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.flash_server --engine vllm --model bobcat-flash-1.1-merged \
-  --compiler-model bobcat-flash-1.1-merged/compiler --quantization fp8 --temperature 0.8912 \
+# These weights (about 52 GB), then the typed-decision server
+# (TypeSafe-compatible /v1/systemone and /v1/models), FP8 at load
+$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-flash-1.1', local_dir='bobcat-flash-1.1')"
+VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.flash_server --engine vllm --model bobcat-flash-1.1 \
+  --compiler-model bobcat-flash-1.1/compiler --quantization fp8 --temperature 0.8912 \
   --name bobcat-flash-1.1 --release-date 2026-09-26 --max-num-seqs 256 --max-model-len 32832 \
   --schedule all --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
-```
-
-Load-tested from the staged repository folder on one RTX PRO 6000 (the Hugging Face download
-line runs once the repository is public): the server answered `/health`, the SDK example below
-answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 91.2% of
-329 questions at 0.28 s per case. The merged weights give the adapter path's answer on 314 of
-319 sampled development decisions, the rest near-ties; details are on the
-[merged card](https://huggingface.co/sanghwa-na/bobcat-flash-1.1-merged).
-
-### Option B: merge this adapter
-
-Tested end to end from a fresh clone, exactly as written below, on one RTX PRO 6000
-Blackwell 96 GB with a fresh Ubuntu 24.04 GPU image (NVIDIA driver 595) and local NVMe:
-about 10 seconds to install, 1.4 minutes to download the base, 1.5 minutes to merge and
-2.5 minutes until the server was ready. The adapter came from a local copy of this
-repository, so its download was not timed. Through that server the SDK example below
-answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 90.9% and
-91.8% of 329 questions in two fresh installs (91.2% in the tables below; no failed request)
-at 0.28 s per case. The other figures on this card were measured on the same GPU type with
-vLLM 0.30.0 and FP8.
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
-git clone https://github.com/foxl-ai/bobcat && cd bobcat
-export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
-uv venv --python 3.12 .venv-serve
-uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
-  "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
-export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
-
-# 1. The base model at the pinned revision (every file's hash is verified)
-$PY -m bobcat.student_readout download --repo google/gemma-4-26B-A4B-it \
-  --revision 4d7ae4984b7db7de8f8457170b3f1a419ee76d52 --out base
-
-# 2. This adapter, merged into the base in float32 and stored as BF16
-$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-flash-1.1', local_dir='adapter')"
-$PY -m bobcat.student_merge --model-dir base --adapter adapter --out model
-
-# 3. The typed-decision server (TypeSafe-compatible /v1/systemone and /v1/models)
-VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.flash_server --engine vllm --model model \
-  --compiler-model base --quantization fp8 --temperature 0.8912 --name bobcat-flash-1.1 \
-  --max-num-seqs 256 --max-model-len 32832 --schedule all \
-  --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
 ```
 
 Then call it with the official SDK:
@@ -175,10 +131,15 @@ print(result.nouls["billing"].noul, result.choices["route"].choice)
 
 Notes:
 
+- `vllm serve sanghwa-na/bobcat-flash-1.1 --quantization fp8 --max-model-len 32832` also loads
+  these weights, but plain vLLM exposes text generation; the typed-decision contract (closed
+  JSON replies, no generated tokens) comes from the Bobcat servers.
+- `--quantization fp8` is vLLM's online dynamic FP8 of these BF16 weights, the served
+  configuration.
 - `--no-config` keeps uv from applying this repository's development settings to the
   serving environment: `pyproject.toml` constrains setuptools to >= 83, and vLLM 0.30.0
   requires setuptools < 81.
-- `--temperature 0.8912` is the calibration temperature fitted for this adapter on a
+- `--temperature 0.8912` is the calibration temperature fitted for this model on a
   held-out calibration split; it never changes an argmax.
 - `bobcat.api_server` with the same arguments serves Flash too; it tokenizes the state once
   per request and produced the same token IDs on 3,606 questions.
@@ -186,11 +147,13 @@ Notes:
 - `--local` disables the shared secret the servers otherwise require; use it only on a
   loopback or private interface. The server refuses inputs over its limits with HTTP 422
   and never truncates them.
+- `--compiler-model bobcat-flash-1.1/compiler` points the Bobcat compiler at the base
+  model's pinned tokenizer, template and configuration; it checks them against the download
+  receipt in that folder.
 - The compiler reads its identifier list from the repository
   (`reports/2026-09-22-glm-readout-preflight.json`), so run the server from the repository
-  root, or pass `--identifiers adapter/bobcat-identifiers.json` (with option A,
-  `bobcat-flash-1.1-merged/bobcat-identifiers.json`): the same list, in the same
-  format, ships in this repository.
+  root, or pass `--identifiers bobcat-flash-1.1/bobcat-identifiers.json`: the same list ships
+  here.
 
 ## Routing to Bobcat 1.1
 
@@ -229,11 +192,10 @@ MiB after the measurements below, of 97,887 MiB. A BF16 merge of Bobcat 1.1 (abo
 and serving both models in FP8 has not been measured with this server.
 
 ```bash
-# Flash as in option A or B above (model/ with base/, or bobcat-flash-1.1-merged/ with its
-# compiler/); Bobcat 1.1 as the ready-to-serve NVFP4 checkpoint:
+# Flash as in the quickstart (bobcat-flash-1.1/); Bobcat 1.1 as its NVFP4 checkpoint:
 $PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1-nvfp4', local_dir='bobcat-1.1-nvfp4')"
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.route_server \
-  --flash-model model --flash-compiler-model base --flash-temperature 0.8912 \
+  --flash-model bobcat-flash-1.1 --flash-compiler-model bobcat-flash-1.1/compiler --flash-temperature 0.8912 \
   --flash-quantization fp8 --flash-gpu-memory-utilization 0.40 \
   --big-model bobcat-1.1-nvfp4 --big-compiler-model bobcat-1.1-nvfp4/compiler \
   --big-quantization none --big-temperature 1.2008 --big-gpu-memory-utilization 0.46 \
@@ -271,10 +233,10 @@ client-side, see [Latency](#latency)) and keep long states off it.
 
 These are ordinary GPU Linux hosts; the Quickstart above is the whole recipe.
 
-- **Amazon EC2.** One RTX PRO 6000 Blackwell 96 GB (for example `g7e.2xlarge`) serves the
-  FP8 merge, and holds Flash and Bobcat 1.1 (NVFP4) together for the routed server. Use a Deep
-  Learning AMI with a recent NVIDIA driver, and allow about 120 GB of disk for Flash alone
-  (base download plus the merged copy), about 200 GB more with Bobcat 1.1.
+- **Amazon EC2.** One RTX PRO 6000 Blackwell 96 GB (for example `g7e.2xlarge`) serves these
+  weights in FP8, and holds Flash and Bobcat 1.1 (NVFP4) together for the routed server. Use
+  a Deep Learning AMI with a recent NVIDIA driver, and allow about 80 GB of disk for Flash
+  alone, about 30 GB more for the Bobcat 1.1 NVFP4 checkpoint.
 - **Amazon SageMaker AI.** The same commands run in a JupyterLab space or notebook
   instance of an equivalent GPU type. A SageMaker real-time endpoint needs a custom
   container that runs `bobcat.flash_server` or `bobcat.route_server` behind SageMaker's
@@ -287,27 +249,26 @@ hosts (one GPU per server). The SageMaker paths are described here but not teste
 
 Differences are paired, with 95% bootstrap intervals over source components (TypeSafe
 workflows: over cases). The development and sealed-final figures use the evaluation path
-(BF16 base with the unmerged adapter); TypeSafe, SemIf and injection figures use the served
-FP8 model over HTTP.
+(BF16 base with the unmerged adapter); TypeSafe, SemIf and injection figures use these
+merged weights served in FP8 over HTTP.
 
 ### Sealed final
 
-The fresh final built for Bobcat 1.1 from KLUE MRC contexts and Wizard of Seoul dialogues
-that no evaluation split, earlier final or training build used (1,614 decisions, four
-tasks). Flash opened it once, under an authorization recorded together with Bobcat 1.1's
-frozen manifest and before the split was opened.
+A fresh final built from KLUE MRC contexts and Wizard of Seoul dialogues that no evaluation
+split, other final or training build used (1,614 decisions, four tasks). Flash opened it
+once, under an authorization recorded with a frozen manifest before the split was opened.
+The untrained Gemma base was not run on this split.
 
-| Task (decisions) | Flash 1.1 | Bobcat 1.1 | Bobcat 1 |
-|---|---:|---:|---:|
-| Search passage selection (500) | 74.6% | 80.6% | 79.2% |
-| Citation verification (103) | 100.0% | 100.0% | 99.0% |
-| External document screening (550) | 94.9% | 96.9% | 96.5% |
-| Request routing (461) | 99.3% | 99.6% | 99.6% |
-| **Task macro** | **92.21%** | 94.27% | 93.59% |
+| Task (decisions) | Flash 1.1 |
+|---|---:|
+| Search passage selection (500) | 74.6% |
+| Citation verification (103) | 100.0% |
+| External document screening (550) | 94.9% |
+| Request routing (461) | 99.3% |
+| **Task macro** | **92.21%** |
 
-Flash minus Bobcat 1.1: -2.1 points [-3.0, -1.2]; minus Bobcat 1: -1.4 [-2.5, -0.3]; minus
-the Qwen3.8-27B base zero-shot (87.86%): +4.4 [+2.7, +6.1]. 51 routing questions share
-Wizard of Seoul utterances with the Flash corpus; without them Flash scores 92.19%. After
+51 routing questions share Wizard of Seoul utterances with the Flash corpus; without them
+Flash scores 92.19%. After
 temperature, NLL is 0.432 and ECE 0.019. No request failed. The evaluation is Korean and no
 label has been reviewed by a person.
 
@@ -316,19 +277,19 @@ label has been reviewed by a person.
 The v2 development split (3,188 Korean decisions). It was used to select the arm, so it is
 not a held-out test.
 
-| Task | Flash 1.1 | Bobcat 1.1 | Gemma 4 26B-A4B zero-shot |
-|---|---:|---:|---:|
-| Search passage selection | 88.4% | 91.1% | 84.8% |
-| Citation verification | 99.8% | 99.6% | 96.5% |
-| Tool-call review, never trained | 92.8% | 94.5% | 82.3% |
-| External document screening | 94.7% | 96.9% | 88.9% |
-| Request routing | 99.6% | 99.4% | 98.7% |
-| Classification | 77.0% | 80.6% | 68.6% |
-| **Task macro** | **92.07%** | 93.69% | 86.6% |
+| Task | Flash 1.1 | Same base (Gemma 4 26B-A4B-it), zero-shot |
+|---|---:|---:|
+| Search passage selection | **88.4%** | 84.8% |
+| Citation verification | **99.8%** | 96.5% |
+| Tool-call review, never trained | **92.8%** | 82.3% |
+| External document screening | **94.7%** | 88.9% |
+| Request routing | **99.6%** | 98.7% |
+| Classification | **77.0%** | 68.6% |
+| **Task macro** | **92.07%** | 86.6% |
+| NLL / ECE | 0.285 / 0.011 | 1.912 / 0.122 |
 
-Flash minus Bobcat 1: -1.3 points [-2.7, -0.1]; minus its own base zero-shot: +5.4
-[+3.7, +7.2]. NLL 0.285 and ECE 0.011. The base alone is over-confident (fitted temperature
-5.28); Flash's fitted temperature is 0.89.
+Flash minus its base zero-shot: +5.4 points [+3.7, +7.2]. The base alone is over-confident
+(fitted temperature 5.28); Flash's fitted temperature is 0.89.
 
 ### TypeSafe's published workflow examples
 
@@ -373,30 +334,30 @@ evaluation-only; none of their rows was used for training, selection or calibrat
 
 300 development questions, each sent clean and with three attacks (1,200 HTTP requests).
 
-| | Flash 1.1 | Bobcat 1 |
-|---|---:|---:|
-| **Attack success** | **9.7%** | 38.6% |
-| Accuracy: clean / administrator verdict / inside the text / note to an AI grader | 92.7 / 84.3 / 84.0 / 84.3% | 93.0 / 64.7 / 61.7 / 48.7% |
-| Replies outside the output contract (independent wire check) | 0 | 0 |
+| | Flash 1.1 |
+|---|---:|
+| **Attack success** | **9.7%** |
+| Accuracy: clean / administrator verdict / inside the text / note to an AI grader | 92.7 / 84.3 / 84.0 / 84.3% |
+| Replies outside the output contract (independent wire check) | 0 |
 
-Both rows ran on the same served setup. On its evaluation path Bobcat 1.1 scores 7.8%.
+The untrained base was not run on this test.
 
 ### Long inputs
 
-The 300 development questions of Bobcat 1.1's long-input test (50 per task), with the state
-padded by unrelated passages to a length counted in Flash tokens; served FP8 path:
+300 development questions (50 per task), with the state padded by unrelated passages to a
+length counted in Flash tokens; served FP8 path:
 
-| State length | Flash 1.1 | Change [95%] | Gemma 4 26B-A4B zero-shot, change | Bobcat 1.1, change |
+| State length | Flash 1.1 | Change [95%] | Same base, zero-shot | Change |
 |---|---:|---|---:|---:|
-| Unpadded | 92.0% | - | (85.7%) | (93.7%) |
-| 8K tokens | 86.7% | -5.3 [-9.1, -1.8] | -7.0 | 0.0 |
-| 16K tokens | 85.3% | -6.7 [-11.9, -1.9] | -6.7 | -2.7 |
-| 30K tokens | 84.7% | **-7.3 [-12.6, -2.8]** | -7.3 | -1.7 |
+| Unpadded | 92.0% | - | 85.7% | - |
+| 8K tokens | 86.7% | -5.3 [-9.1, -1.8] | 78.7% | -7.0 |
+| 16K tokens | 85.3% | -6.7 [-11.9, -1.9] | 79.0% | -6.7 |
+| 30K tokens | 84.7% | **-7.3 [-12.6, -2.8]** | 78.3% | -7.3 |
 
 Most of the drop is in tool-call review (92% to 70% at 30K) and classification (74% to 58%).
 BF16 weights lose as much (-7.7 at 30K), so FP8 is not the cause, and the untrained base
-loses the same 7.3 points; Flash's training corpus had no padded long rows. Bobcat 1.1's
-column is from its own evaluation path. **The routed server sends every question longer
+loses the same 7.3 points; Flash's training corpus had no padded long rows. **The routed
+server sends every question longer
 than 2,048 Flash tokens to Bobcat 1.1** and then matches it at 8K, 16K and 30K (see
 [Routing](#routing-to-bobcat-11)). With `--max-model-len 32832` Flash accepts up to 32,768
 Flash tokens per compiled question (one 32,704-token request took 1.90 s); Gemma's tokenizer
@@ -413,7 +374,7 @@ never truncated.
 | Throughput, independent 1K-token requests | 48,750 tokens/s |
 | TypeSafe workflow case, served over localhost HTTP: median / mean / Invoice median | 0.297 / 0.62 / 1.50 s |
 
-The same architecture with an earlier Flash checkpoint took 15.9 ms (first profile) and
+The same architecture, measured with a checkpoint from the first training stage, took 15.9 ms (first profile) and
 0.185 s per workflow case on one H200, and 13.7 ms and 0.226 s on one B200.
 
 **Client-side.** A separate client host over HTTPS, one reused connection, one request at a
@@ -438,7 +399,14 @@ Latency under concurrent HTTP load has not been measured.
 
 ### Serving precision
 
-FP8 serving gives the evaluation path's answer on 98.4% of development questions (task
+**These weights and the adapter path.** On a development sample (every 10th decision of the
+v2 development split, 319 decisions across the six tasks), these merged BF16 weights and the
+evaluation path (BF16 base with the unmerged adapter, the same code, one RTX PRO 6000) gave the
+same top answer on 314 (98.4%) and the same accuracy (291 of 319 correct, 91.2%); the five
+changed answers were all search near-ties (top two within 0.08). The shards are
+byte-identical to the merge behind every served figure on this card.
+
+Served in FP8, Flash gives the evaluation path's answer on 98.4% of development questions (task
 macro 92.1% to 91.8%). An NVFP4 build (every expert quantized) was **slower and less
 accurate** on this GPU: 44,012 against 48,594 tokens/s, -0.68 points [-1.59, +0.14] on
 development and 89.1% against 91.2% on TypeSafe's workflows. Serve FP8.
@@ -453,28 +421,27 @@ development and 89.1% against 91.2% on TypeSafe's workflows. Serve FP8.
   (the five global layers have no v projection), the dense MLP and the expert router of all
   30 layers; 80.0M trainable parameters. The 128 experts, embeddings and output head are
   frozen.
-- **Teachers:** Bobcat 1 (Qwen3.8-27B with the Bobcat 1 adapter, merged, temperature
-  1.149) and the first Bobcat 1.1 candidate (the stage-1 adapter of Bobcat 1.1, temperature
-  1.188), each read once over the whole corpus with the served readout. The teachers never
-  saw the gold labels. The released Bobcat 1.1 adapter was finished later and was not a
-  teacher.
+- **Teachers:** two Bobcat LoRA adapters of Qwen3.8-27B, each merged and read once over the
+  whole corpus with the served readout: teacher A (adapter sha256 `2704495d…`, temperature
+  1.149) and teacher B, the stage-1 adapter of Bobcat 1.1 (`33a323d1…`, temperature 1.188).
+  The teachers never saw the gold labels.
 - **Loss per question:** KL(teacher || student) at the teacher's calibration temperature,
-  plus 0.5 times the Bobcat 1 gold loss (cross-entropy for Choice and Noul, expected-level
-  error for Score) where a gold label exists.
+  plus 0.5 times the gold loss (cross-entropy for Choice and Noul, expected-level error for
+  Score) where a gold label exists.
 - **Stages** (eight NVIDIA B200 GPUs, AdamW with betas 0.9/0.95, 3% warmup, cosine decay to
   10%, gradient clip 1.0):
 
   | Stage | Data | Teacher | Learning rate | Steps |
   |---|---|---|---:|---:|
-  | 1 | whole corpus, one epoch | Bobcat 1 | 2e-4 | 1,401 |
-  | 2 | whole corpus, half an epoch | Bobcat 1.1 candidate | 1e-4 | 700 |
-  | 3 | the Bobcat 1 training mixture, one epoch, gold plus teacher | Bobcat 1.1 candidate | 5e-5 | 214 |
+  | 1 | whole corpus, one epoch | A | 2e-4 | 1,401 |
+  | 2 | whole corpus, half an epoch | B | 1e-4 | 700 |
+  | 3 | teacher A's training mixture, one epoch, gold plus teacher | B | 5e-5 | 214 |
 
 - **Corpus (447,904 questions, 257,710 source components; frozen once):**
 
   | Source | Questions | Gold label |
   |---|---:|---|
-  | Bobcat 1 training mixture (KLUE MRC, Wizard of Seoul, policy transfer, public data) | 50,409 | yes |
+  | Teacher A's training mixture (KLUE MRC, Wizard of Seoul, policy transfer, public data) | 50,409 | yes |
   | Further public decisions (KorNLI; KLUE NLI, YNAT, STS; NSMC; HelpSteer 2 and 3; MASSIVE; Banking77; BoolQ; ARC) | 158,298 | yes |
   | New questions on the same public states (evidence/claim, topic, urgency, answerability) | 94,041 | partly |
   | Generated workflows and games (invoices, security logs, support tickets, tic-tac-toe, grid paths, a shooter's strategy sentences, link races) | 97,297 | partly |
@@ -484,10 +451,17 @@ development and 89.1% against 91.2% on TypeSafe's workflows. Serve FP8.
   369,418 questions have a gold label and 78,486 carry only teacher probabilities; 165,719
   (37%) are English.
 - **Calibration:** one temperature, 0.8912, fitted on the held-out calibration split.
+- **Merge:** the adapter (`adapter_model.safetensors` sha256 `2304bd8e…9ca3`) merged into the
+  base with `bobcat.student_merge` in the serving environment (vLLM 0.30.0, torch 2.13.0): each
+  of the 235 adapted weights becomes `bf16(W + (alpha/r) B A)` (alpha/r = 2.0) with the product
+  and sum in float32; the 128 experts and every other tensor are copied. Shard hashes:
+  `model-00001-of-00002.safetensors` `6847aa86…a14a7`, `model-00002-of-00002.safetensors`
+  `d72e4385…bb72a`, in `SHA256SUMS.json` and the release manifest
+  (`serving_artifacts.merged_bf16`).
 - **Selection:** the arm with the highest development macro among the Gemma 4 26B-A4B arms.
   TypeSafe, SemIf and injection results were not used to select.
 - **Provenance:** **No output of Jev was used for training, distillation, reward or
-  calibration**; the only teachers were the two Bobcat models above, and no GLM teacher was
+  calibration**; the only teachers were the two Bobcat adapters above, and no GLM teacher was
   run. No TypeSafe, SemIf, Every or cookbook evaluation row was used: rows matching any of
   4,495 strings of 16 characters or more from those sets were blocked (none matched), as
   were rows sharing text with the development, calibration or final splits. Tool-call review
@@ -496,21 +470,18 @@ development and 89.1% against 91.2% on TypeSafe's workflows. Serve FP8.
 ## Limitations and risks
 
 - **Lower search accuracy.** Search passage selection is Flash's weakest task: 74.6% on the
-  sealed final against 80.6% for Bobcat 1.1, and 88.4% against 91.1% on development, where
-  title matching with 77 to 255 candidates falls most. The routed server sends questions
-  with more than 64 candidates to Bobcat 1.1.
-- Flash is 2.1 points below Bobcat 1.1 on the sealed final and 1.6 points below it on
-  development; tool-call review and classification also trail.
+  sealed final and 88.4% on development, where title matching with 77 to 255 candidates falls
+  most. The routed server sends questions with more than 64 candidates to Bobcat 1.1.
+- Classification (77.0% on development) is the other weak task.
 - **Multi-question requests.** Gemma 4's sliding-window layers keep vLLM's prefix cache from
   reusing a shared state exactly, so a request with many questions recomputes part of its
   state (about 1.6 times the request's tokens on a 37-state, 777-question benchmark).
 - **Near-ties move between server runs.** Two fresh installs of the served FP8 model
   scored 90.9% and 91.8% on TypeSafe's 329 workflow questions: 6 top answers changed, each
-  with a top probability of 0.70 or less. Bobcat 1.1 in FP8 gave the same top answers in
-  four runs. Where an answer must be reproducible, send questions below Flash's 0.8
+  with a top probability of 0.70 or less. Where an answer must be reproducible, send
+  questions below Flash's 0.8
   threshold to Bobcat 1.1, as `bobcat.route_server` does.
-- Insufficient evidence is as hard for Flash as for Bobcat (WANLI256 0.734). Give it an
-  explicit "not stated" option.
+- Insufficient evidence is hard (WANLI256 0.734). Give it an explicit "not stated" option.
 - **Long states.** On its own, Flash loses 7.3 points at a 30K-token state and 5.3 already
   at 8K (see [Long inputs](#long-inputs)). Serve long inputs through the routed server,
   whose length rule sends them to Bobcat 1.1, or through Bobcat 1.1 directly. With the rule,
@@ -543,12 +514,11 @@ Bobcat Flash for safety-critical or legal decisions.
 
 ## License and attribution
 
-The adapter is released under Apache-2.0 and is a derivative of Gemma 4 26B-A4B-it by
-Google DeepMind, which is released under the Apache License 2.0 (the pinned revision's card
-metadata and its linked
-[Gemma 4 license](https://ai.google.dev/gemma/docs/gemma_4_license) page, checked on
-2026-09-26). Its teachers, Bobcat 1 and the Bobcat 1.1 candidate, are Apache-2.0 adapters of
-Qwen3.8-27B (Apache-2.0). Training data keep their own licenses: KLUE, KorNLI, ARC and SNLI
+These weights are released under Apache-2.0 as a derivative of Gemma 4 26B-A4B-it by Google
+DeepMind, which is released under the Apache License 2.0 (the pinned revision's card metadata
+and its linked [Gemma 4 license](https://ai.google.dev/gemma/docs/gemma_4_license) page,
+checked on 2026-09-26); the license text is included as `LICENSE`, and `NOTICE` lists what
+was changed. Its teachers are Apache-2.0 Bobcat adapters of Qwen3.8-27B (Apache-2.0). Training data keep their own licenses: KLUE, KorNLI, ARC and SNLI
 (CC BY-SA 4.0), BoolQ (CC BY-SA 3.0), NSMC (CC0 1.0), MASSIVE, Banking77 and HelpSteer 2 and 3
 (CC BY 4.0), and MultiNLI (mostly the Open American National Corpus license, with fiction
 under CC BY-SA 3.0 and CC BY 3.0). Attributions are in the code repository's
@@ -557,20 +527,12 @@ under CC BY-SA 3.0 and CC BY 3.0). Attributions are in the code repository's
 Bobcat is an independent project. It is not affiliated with or endorsed by TypeSafe AI,
 Google, the Qwen team, Anthropic, OpenAI, Every or any other company named here; product
 names are their owners' trademarks and are used only to identify the models compared.
-TypeSafe's and SemIf's evaluation data are not redistributed here. The adapter is provided
+TypeSafe's and SemIf's evaluation data are not redistributed here. The weights are provided
 as is, without warranty.
 
 ## Citation
 
 ```bibtex
-@techreport{bobcat2026,
-  title       = {Bobcat: Typed Decisions from One Forward Pass},
-  author      = {{The Bobcat Authors}},
-  institution = {Foxl AI},
-  year        = {2026},
-  url         = {https://foxl.ai/blog/bobcat-typed-decisions}
-}
-
 @misc{bobcatflash11,
   title        = {Bobcat Flash 1.1},
   author       = {{The Bobcat Authors}},

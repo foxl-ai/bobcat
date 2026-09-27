@@ -13,8 +13,6 @@
 <p align="center">
   <a href="https://huggingface.co/sanghwa-na/bobcat-1.1">Bobcat 1.1</a> &nbsp;·&nbsp;
   <a href="https://huggingface.co/sanghwa-na/bobcat-flash-1.1">Bobcat Flash 1.1</a> &nbsp;·&nbsp;
-  <a href="https://foxl.ai/blog/bobcat-typed-decisions">Technical report</a> &nbsp;·&nbsp;
-  <a href="paper/build/main.pdf">Paper (PDF)</a> &nbsp;·&nbsp;
   <a href="#quickstart">Quickstart</a>
 </p>
 
@@ -33,33 +31,29 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 
 ## Models
 
-| Model | Adapter for | Sealed final (1,614 decisions) | TypeSafe workflow agreement, served | Median time per workflow case | One decision, p50 |
-|---|---|---:|---:|---:|---:|
-| [Bobcat 1.1](release/hf/bobcat-1.1/README.md) | Qwen3.8-27B, LoRA r16 | **94.27%** | 91.2% | 0.52-0.58 s (NVFP4) | 42.8 ms (NVFP4) |
-| [Bobcat Flash 1.1](release/hf/bobcat-flash-1.1/README.md) | Gemma 4 26B-A4B, LoRA r64 | 92.21% | 91.2% | **0.297 s** (FP8) | **24.8 ms** (FP8) |
-| Bobcat 1 (earlier model, for comparison; not distributed) | Qwen3.8-27B, LoRA r16 | 93.59% | 92.1% | 0.84 s (FP8) | 57.5 ms (FP8) |
+| Model | Weights (Hugging Face) | Base model | Sealed final (1,614 decisions) | Same base, zero-shot | TypeSafe workflow agreement, served | Median time per workflow case | One decision, p50 |
+|---|---|---|---:|---:|---:|---:|---:|
+| [Bobcat 1.1](release/hf/bobcat-1.1/README.md) | [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) (BF16), [sanghwa-na/bobcat-1.1-nvfp4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) | Qwen3.8-27B | **94.27%** | 87.86% | 91.2% | 0.52-0.58 s (NVFP4) | 42.8 ms (NVFP4) |
+| [Bobcat Flash 1.1](release/hf/bobcat-flash-1.1/README.md) | [sanghwa-na/bobcat-flash-1.1](https://huggingface.co/sanghwa-na/bobcat-flash-1.1) (BF16) | Gemma 4 26B-A4B | 92.21% | not run | 91.2% | **0.297 s** (FP8) | **24.8 ms** (FP8) |
 
-All three on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0: times per case are
-server-side over localhost HTTP, one decision is 512 tokens with 8 candidates measured in
-the vLLM engine. On TypeSafe's 20 published workflow examples (329 questions) Jev agrees
-with the reference on 90.9% at 0.42 s per case (TypeSafe's published client-side time);
-Jev was never called. Bobcat 1.1 cut the rate at which a wrong answer named inside the state
-wins from 39.6% (Bobcat 1) to 7.8%. Flash answers most questions itself; in one server
+Both on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0: times per case are server-side
+over localhost HTTP, one decision is 512 tokens with 8 candidates measured in the vLLM
+engine. On TypeSafe's 20 published workflow examples (329 questions) Jev agrees with the
+reference on 90.9% at 0.42 s per case (TypeSafe's published client-side time); Jev was never
+called. A wrong answer named inside the state wins 7.8% of attacks on Bobcat 1.1 and 21.0%
+on its untrained base. Flash answers most questions itself; in one server
 (`bobcat.route_server`) it hands the ones it is unsure about, and every question longer than
 2,048 Flash tokens with its state, to Bobcat 1.1.
 
-Bobcat 1.1 and Bobcat Flash 1.1 come as LoRA adapters and as ready-to-serve weights:
-[sanghwa-na/bobcat-1.1-nvfp4](release/hf/bobcat-1.1-nvfp4/README.md), the NVFP4 checkpoint
-behind the 1.1 figures (Blackwell GPUs), and
-[sanghwa-na/bobcat-flash-1.1-merged](release/hf/bobcat-flash-1.1-merged/README.md), Flash
-merged in BF16 and served in FP8. The model cards give every number with its conditions and
-limits, including the targets that were not met and the negative results.
+The weights are ready to serve: each repository holds the trained model merged into its
+base (BF16), served in FP8 by vLLM, and Bobcat 1.1 also comes as the NVFP4 checkpoint behind
+its latency figures (Blackwell GPUs). The model cards give every number with its conditions
+and limits, including the targets that were not met and the negative results. The technical
+report is being revised for these models.
 
 ## Quickstart
 
-On one Linux GPU host. This recipe, and the Flash card's, were run exactly as written from a
-fresh clone on one RTX PRO 6000 96 GB with Bobcat 1.1 and Bobcat Flash 1.1; an earlier form
-was tested with Bobcat 1 on one L40S 48 GB (FP8) and one H100 80 GB.
+On one Linux GPU host:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
@@ -70,24 +64,18 @@ uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi 
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
-$PY -m bobcat.student_readout download --repo Qwen/Qwen3.8-27B \
-  --revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --out base
-$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1', local_dir='adapter')"
-$PY -m bobcat.student_merge --model-dir base --adapter adapter --out model
-mkdir -p compiler && cp base/{tokenizer.json,tokenizer_config.json,chat_template.jinja,config.json,bobcat-download.json} compiler/
-
-VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model model \
-  --compiler-model compiler --quantization fp8 --temperature 1.2008 --name bobcat-1.1 \
+$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1', local_dir='bobcat-1.1')"
+VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model bobcat-1.1 \
+  --compiler-model bobcat-1.1/compiler --quantization fp8 --temperature 1.2008 --name bobcat-1.1 \
   --release-date 2026-09-26 --max-num-seqs 128 --host 127.0.0.1 --port 8000 --local
 ```
 
 Then point the SDK at it: `TYPESAFE_BASE_URL=http://127.0.0.1:8000`,
-`TYPESAFE_DEFAULT_MODEL=bobcat-1.1`, any `TYPESAFE_API_KEY`.
-Bobcat Flash 1.1 has its own base, server settings and routing recipe in
-[its card](release/hf/bobcat-flash-1.1/README.md).
-The cards also cover running on AWS. `--no-config` keeps uv from applying this
-repository's development constraint (setuptools >= 83; vLLM 0.30.0 needs < 81) to the
-serving environment.
+`TYPESAFE_DEFAULT_MODEL=bobcat-1.1`, any `TYPESAFE_API_KEY`. Bobcat Flash 1.1 has its own
+server settings and routing recipe in [its card](release/hf/bobcat-flash-1.1/README.md). The
+cards also cover the NVFP4 checkpoint and running on AWS. `--no-config` keeps uv from
+applying this repository's development constraint (setuptools >= 83; vLLM 0.30.0 needs < 81)
+to the serving environment.
 
 ## Repository
 
@@ -102,7 +90,6 @@ serving environment.
 | `src/bobcat/flash_data.py`, `flash_teacher.py`, `flash_train.py` | the Flash corpus, teacher probabilities and distillation |
 | `src/bobcat/product_eval.py`, `korean_bench.py` | the six-task evaluation builder (including fresh finals) and the public benchmark sets |
 | `scripts/` | calibration, scoring, the TypeSafe workflow and SemIf comparisons, NVFP4 quantization, release staging |
-| `paper/` | the technical report in LaTeX, its figures and the built PDF |
 | `release/` | the release manifests, the model cards and their figures |
 | `configs/`, `tests/` | pinned data and model sources, and the test suite |
 
@@ -116,12 +103,11 @@ uv run ruff check src tests scripts
 
 ## License
 
-The code is released under the [Apache License 2.0](LICENSE). The Bobcat 1.1 adapter and its
-NVFP4 checkpoint are released under Apache-2.0 as derivatives of Qwen3.8-27B, and the Bobcat
-Flash 1.1 adapter and its merged checkpoint under Apache-2.0 as derivatives of Gemma 4
-26B-A4B-it (Apache-2.0). Datasets
-keep their own licenses; third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md) and
-[licenses/](licenses/).
+The code is released under the [Apache License 2.0](LICENSE). The Bobcat 1.1 weights and
+their NVFP4 checkpoint are released under Apache-2.0 as derivatives of Qwen3.8-27B, and the
+Bobcat Flash 1.1 weights under Apache-2.0 as a derivative of Gemma 4 26B-A4B-it (Apache-2.0).
+Datasets keep their own licenses; third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md)
+and [licenses/](licenses/).
 
 Bobcat is an independent project. It is not affiliated with or endorsed by TypeSafe AI,
 Google, the Qwen team or any other company named here; product names are their owners'
@@ -130,11 +116,10 @@ trademarks and are used only to identify the models compared.
 ## Citation
 
 ```bibtex
-@techreport{bobcat2026,
-  title       = {Bobcat: Typed Decisions from One Forward Pass},
-  author      = {{The Bobcat Authors}},
-  institution = {Foxl AI},
-  year        = {2026},
-  url         = {https://foxl.ai/blog/bobcat-typed-decisions}
+@misc{bobcat11,
+  title        = {Bobcat 1.1},
+  author       = {{The Bobcat Authors}},
+  year         = {2026},
+  howpublished = {\url{https://huggingface.co/sanghwa-na/bobcat-1.1}}
 }
 ```

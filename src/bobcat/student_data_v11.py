@@ -1,8 +1,9 @@
-"""Bobcat 1.1 training mixture: Bobcat 1's sources plus robustness counterfactuals.
+"""Bobcat 1.1 training mixture: the base product, policy and public sources plus robustness
+counterfactuals.
 
-Built on `student_data` (the Bobcat 1 mixture, unchanged) in four steps:
+Built on `student_data` (the base mixture builder, unchanged) in four steps:
   build    the same product, policy and public sources with higher caps for the English
-           public sources Bobcat 1 already used (same licences) and extra English policy
+           public sources the base mixture already uses (same licences) and extra English policy
            rows; Korean caps are unchanged. Rows whose text appears in any evaluation split
            (the v2 dev/calibration/final and the fresh 1.1 final) are dropped.
   inject   copies of training rows whose state carries a sentence naming an answer: a note
@@ -44,7 +45,7 @@ from bobcat.protocol import RequestLimitError, parse_request
 from bobcat.schema import file_hash, json_hash
 
 SCHEMA = "bobcat-student-mixture-v11"
-# English public sources Bobcat 1 already trained on; licences are read from the rows.
+# English public sources the base mixture already uses; licences are read from the rows.
 PUBLIC_CAPS = {**sd.PUBLIC_CAPS, "boolq": 5000, "arc_easy": 2100, "arc_challenge": 1100,
                "banking77": 3500, "massive_en-US": 3000, "helpsteer2": 2500,
                "helpsteer3": 1500}
@@ -186,7 +187,7 @@ def strings(value) -> list[str]:
 
 def build(product: Path, policy: Path, public: Path, eval_dirs: list[Path], out: Path,
           snli: Path | None = None, seed: int = 2026092604) -> dict:
-    """Bobcat 1's three sources with the 1.1 caps, plus English SNLI rows; train/monitor
+    """The base mixture's three sources with the 1.1 caps, plus English SNLI rows; train/monitor
     split by component."""
     if out.exists():
         raise ValueError("Outputs are immutable; choose a new path.")

@@ -2,16 +2,15 @@
 license: apache-2.0
 base_model: Qwen/Qwen3.8-27B
 base_model_revision: 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
-base_model_relation: adapter
-library_name: peft
+base_model_relation: finetune
+library_name: transformers
 language:
 - en
 - ko
 pipeline_tag: zero-shot-classification
 tags:
-- lora
-- peft
 - typed-decisions
+- vllm
 - calibration
 - classification
 - reranking
@@ -38,13 +37,14 @@ you named, and nothing else. It never generates text: it reads the logits of the
 candidates at the first answer position of one forward pass, and the host builds a closed
 JSON reply from your own names. An answer can be wrong, but it cannot be malformed.
 
-This repository, `sanghwa-na/bobcat-1.1`, holds the **Bobcat 1.1 LoRA adapter** for
-[Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) (Apache-2.0) at revision
-`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It uses the same base, compiler, readout and
-server as Bobcat 1, the earlier model it succeeds, which is not distributed; Bobcat 1 figures
-on this card are for comparison only. The compiler, server and evaluation code are at
-[github.com/foxl-ai/bobcat](https://github.com/foxl-ai/bobcat). A faster tier built from
-this model is [Bobcat Flash 1.1](https://huggingface.co/sanghwa-na/bobcat-flash-1.1).
+This repository, `sanghwa-na/bobcat-1.1`, holds **Bobcat 1.1 as ready-to-serve BF16
+weights**: a rank-16 LoRA trained on [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B)
+(Apache-2.0) at revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`, merged into the base.
+vLLM serves it in FP8. For NVIDIA Blackwell GPUs, the NVFP4 checkpoint behind this card's
+latency figures is at [sanghwa-na/bobcat-1.1-nvfp4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4).
+The compiler, server and evaluation code are at
+[github.com/foxl-ai/bobcat](https://github.com/foxl-ai/bobcat). A faster tier is
+[Bobcat Flash 1.1](https://huggingface.co/sanghwa-na/bobcat-flash-1.1).
 
 ![Bobcat 1.1 at a glance](assets/bobcat-1.1-highlights.png)
 
@@ -52,33 +52,31 @@ this model is [Bobcat Flash 1.1](https://huggingface.co/sanghwa-na/bobcat-flash-
 
 | | Bobcat 1.1 | Reference |
 |---|---:|---|
-| Sealed final, four tasks (1,614 decisions, opened once) | **94.27%** | Bobcat 1 93.59% (+0.7 pt [-0.0, +1.5]); same base zero-shot 87.86% |
-| Wrong answer named inside the state wins (300 questions x 3 attacks) | **7.8%** | Bobcat 1 39.6%; same base zero-shot 21.0% |
-| Six-task development evaluation (3,188 decisions) | **93.69%** | Bobcat 1 93.41%; same base zero-shot 85.48% |
+| Sealed final, four tasks (1,614 decisions, opened once) | **94.27%** | same base zero-shot 87.86% (+6.4 pt [+4.8, +8.1]) |
+| Wrong answer named inside the state wins (300 questions x 3 attacks) | **7.8%** | same base zero-shot 21.0% |
+| Six-task development evaluation (3,188 decisions) | **93.69%** | same base zero-shot 85.48% (+8.2 pt [+6.8, +9.4]) |
 | TypeSafe's published workflow examples: agreement with the reference (329 questions) | **92.1%** | Jev 90.9%, Claude Opus 5 92.4%, GPT-5.6 Sol 93.0% |
 | SemIf's 102 aligned TypeSafe rows: modal agreement | **0.872** | Jev 0.883 |
 | One decision (512 tokens, 8 candidates), p50 | **42.8 ms** | one RTX PRO 6000 Blackwell, NVFP4, vLLM engine |
 | Median time per TypeSafe workflow case, served | **0.52-0.58 s** | Jev 0.42 s (TypeSafe's published client-side time) |
 
 Jev, Opus 5 and Sol figures are TypeSafe's own published answers and times; Jev was never
-called. See [Evaluation](#evaluation) for what each number does and does not mean, and
-[Limitations](#limitations-and-risks) for the targets 1.1 did not meet.
+called. The same-base baseline is untrained Qwen3.8-27B with the same compiler and readout.
+See [Evaluation](#evaluation) for what each number does and does not mean, and
+[Limitations](#limitations-and-risks) for the targets Bobcat 1.1 did not meet.
 
-## What changed from Bobcat 1
+## What it was trained for
 
-- **Injected answers.** Bobcat 1 followed a wrong answer named inside the state more often
-  than its base model did (39.6% against 21.0%). Bobcat 1.1 was trained on 8,100
-  counterfactual copies in which a note to an AI grader, an instruction inside the text or
-  an administrator "final verdict" names an answer while the gold stays unchanged (in 20% of
-  them the named answer is the right one, so "a named answer is wrong" is not a shortcut).
-  Attack success is now 7.8%.
-- **More English.** 36.0% of the training decisions are English (Bobcat 1: 18%), including
-  SNLI and SQuAD 2.0.
+- **Wrong answers named inside the state.** 8,100 counterfactual copies in which a note to an
+  AI grader, an instruction inside the text or an administrator "final verdict" names an
+  answer while the gold stays unchanged (in 20% of them the named answer is the right one, so
+  "a named answer is wrong" is not a shortcut). Attack success is 7.8%, against 21.0% for the
+  untrained base.
+- **English as well as Korean.** 36.0% of the training decisions are English, including SNLI
+  and SQuAD 2.0.
 - **Insufficient evidence and long inputs.** 6,100 copies whose evidence was removed or
   swapped, and 1,600 states padded to 8K-32K tokens. These moved the targets less than
   hoped; see [Limitations](#limitations-and-risks).
-- Classification on the development set rose from 77.6% to 80.6%; the other tasks moved by
-  about a point or less.
 
 ## What it does
 
@@ -107,16 +105,13 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 
 ## Quickstart: serve Bobcat 1.1 on one GPU
 
-Two ways, with the same environment and the same server:
-
-- **Option A: ready-to-serve weights.**
-  [sanghwa-na/bobcat-1.1-nvfp4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) is the
-  exact NVFP4 checkpoint behind this card's latency figures, for NVIDIA Blackwell GPUs (FP4
-  tensor cores). Nothing to merge.
-- **Option B: this adapter, merged on your machine.** Any GPU that runs vLLM's FP8 (for example
-  L40S, H100 or RTX PRO 6000); it takes the base download and a two-minute merge.
-
-### Option A: ready-to-serve NVFP4 weights
+The staged files of this repository were load-tested on one RTX PRO 6000 Blackwell 96 GB with
+vLLM 0.30.0 by the commands below (the download line runs once the repository is public):
+`vllm serve` came up and listed the model; the Bobcat server was ready two minutes after it
+started, answered `/health`, the SDK example below answered `payments`, and TypeSafe's 20
+workflow cases agreed with the reference on 92.1% of 329 questions (no failed request; the
+evaluation path also gives 92.1%) at 0.85 s per case in FP8. The other figures below were
+measured on the same GPU type with vLLM 0.30.0.
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
@@ -127,52 +122,11 @@ uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi 
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
-$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1-nvfp4', local_dir='bobcat-1.1-nvfp4')"
-VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model bobcat-1.1-nvfp4 \
-  --compiler-model bobcat-1.1-nvfp4/compiler --quantization none --temperature 1.2008 \
-  --name bobcat-1.1 --release-date 2026-09-26 --max-num-seqs 128 --schedule all \
-  --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
-```
-
-Load-tested from the staged repository folder on one RTX PRO 6000 (the Hugging Face download
-line runs once the repository is public): the server answered `/health`, the SDK example below
-answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 90.9% of
-329 questions at 0.61 s per case (the measured NVFP4 runs: 91.2%, 0.52-0.58 s; NVFP4 moves
-near-ties between runs). Details are on the
-[NVFP4 card](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4).
-
-### Option B: merge this adapter
-
-Tested end to end from a fresh clone, exactly as written below, on one RTX PRO 6000
-Blackwell 96 GB with a fresh Ubuntu 24.04 GPU image (NVIDIA driver 595) and local NVMe:
-about 10 seconds to install, 1.4 minutes to download the base, 2 minutes to merge and
-2.5-4 minutes until the server was ready. The adapter came from a local copy of this
-repository, so its download was not timed. Through that server the SDK example below
-answered `payments`, and TypeSafe's 20 workflow cases agreed with the reference on 92.1% of
-329 questions (no failed request; the evaluation path also gives 92.1%) at 0.86 s per case
-in FP8. The other figures below were measured on the same GPU type with vLLM 0.30.0.
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH"   # uv
-git clone https://github.com/foxl-ai/bobcat && cd bobcat
-export UV_PYTHON_PREFERENCE=only-managed   # a uv-managed Python ships the headers Triton compiles against
-uv venv --python 3.12 .venv-serve
-uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi uvicorn scipy jinja2 \
-  "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
-export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
-
-# 1. The base model at the pinned revision (every file's hash is verified)
-$PY -m bobcat.student_readout download --repo Qwen/Qwen3.8-27B \
-  --revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --out base
-
-# 2. This adapter, merged into the base in float32 and stored as BF16
-$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1', local_dir='adapter')"
-$PY -m bobcat.student_merge --model-dir base --adapter adapter --out model
-mkdir -p compiler && cp base/{tokenizer.json,tokenizer_config.json,chat_template.jinja,config.json,bobcat-download.json} compiler/
-
-# 3. The typed-decision server (TypeSafe-compatible /v1/systemone and /v1/models)
-VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model model \
-  --compiler-model compiler --quantization fp8 --temperature 1.2008 --name bobcat-1.1 \
+# These weights (about 54 GB), then the typed-decision server
+# (TypeSafe-compatible /v1/systemone and /v1/models), FP8 at load
+$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1', local_dir='bobcat-1.1')"
+VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model bobcat-1.1 \
+  --compiler-model bobcat-1.1/compiler --quantization fp8 --temperature 1.2008 --name bobcat-1.1 \
   --release-date 2026-09-26 --max-num-seqs 128 --host 127.0.0.1 --port 8000 --local
 ```
 
@@ -197,15 +151,23 @@ print(result.nouls["billing"].noul, result.choices["route"].choice)
 
 Notes:
 
+- `vllm serve sanghwa-na/bobcat-1.1 --quantization fp8 --max-model-len 16448` also loads these
+  weights, but plain vLLM exposes text generation; the typed-decision contract (closed JSON
+  replies, no generated tokens) comes from `bobcat.api_server`.
+- `--quantization fp8` is vLLM's online dynamic FP8 of the BF16 weights. For the NVFP4
+  checkpoint on a Blackwell GPU, download `sanghwa-na/bobcat-1.1-nvfp4` instead and pass
+  `--model bobcat-1.1-nvfp4 --compiler-model bobcat-1.1-nvfp4/compiler --quantization none`
+  (see its card).
 - `--no-config` keeps uv from applying this repository's development settings to the
   serving environment: `pyproject.toml` constrains setuptools to >= 83, and vLLM 0.30.0
   requires setuptools < 81.
-- `--temperature 1.2008` is the calibration temperature fitted for this adapter on a
+- `--temperature 1.2008` is the calibration temperature fitted for this model on a
   held-out calibration split; it never changes an argmax.
 - The served workflow timings below add `--schedule all --engine-arg
   max_num_batched_tokens=16384`, which schedule every question of a request together.
-  In FP8 on the fresh install this gave the same answers at 0.85 s per case; the 0.52-0.58 s
-  figures are NVFP4.
+- `--compiler-model bobcat-1.1/compiler` points the Bobcat compiler at the base model's
+  pinned tokenizer, template and configuration; it checks them against the download receipt
+  in that folder.
 - `--local` disables the shared secret the server otherwise requires; use it only on a
   loopback or private interface.
 - The server refuses inputs over its limits (128 questions, 255 candidates, 16,384 tokens
@@ -214,66 +176,62 @@ Notes:
   long-input figures below before relying on it.
 - The compiler reads its identifier list from the repository
   (`reports/2026-09-22-glm-readout-preflight.json`), so run the server from the repository
-  root, or pass `--identifiers adapter/bobcat-identifiers.json` (with option A,
-  `bobcat-1.1-nvfp4/bobcat-identifiers.json`): the same list, in the same
-  format, ships in this repository.
-- **NVFP4 (Blackwell GPUs).** The latency figures below come from an NVFP4 W4A4 build of
-  the merged model made with `scripts/nvfp4_quantize.py` (llm-compressor 0.14.0, 256
-  compiled development prompts). That build is not published here; FP8 gives the same
-  accuracy (see [Serving precision](#serving-precision)).
+  root, or pass `--identifiers bobcat-1.1/bobcat-identifiers.json`: the same list ships here.
 
 ## Running on AWS
 
 These are ordinary GPU Linux hosts; the Quickstart above is the whole recipe.
 
-- **Amazon EC2.** One RTX PRO 6000 Blackwell 96 GB (for example `g7e.2xlarge`) serves the
-  FP8 or NVFP4 merge; one L40S 48 GB (for example `g6e.2xlarge`) serves the FP8 merge with
-  up to 128 concurrent sequences. Use a Deep Learning AMI with a recent NVIDIA driver, and
-  allow about 200 GB of disk for the base download plus the merged copy.
+- **Amazon EC2.** One RTX PRO 6000 Blackwell 96 GB (for example `g7e.2xlarge`) serves these
+  weights in FP8 or the NVFP4 checkpoint; in FP8 they also fit one L40S 48 GB (for example
+  `g6e.2xlarge`) with up to 128 concurrent sequences. Use a Deep Learning AMI with a recent
+  NVIDIA driver, and allow about 80 GB of disk for the download and caches.
 - **Amazon SageMaker AI.** The same commands run in a JupyterLab space or notebook
   instance of an equivalent GPU type (for example `ml.g6e.2xlarge`). A SageMaker real-time
   endpoint needs a custom container that runs `bobcat.api_server` behind SageMaker's
   `/invocations` and `/ping` routes; we have not published or tested one.
 
-Our 1.1 measurements ran on an EC2 RTX PRO 6000 host. The SageMaker paths are described
+Our measurements ran on an EC2 RTX PRO 6000 host. The SageMaker paths are described
 here but not tested by us.
 
 ## Evaluation
 
-All Bobcat 1.1, Bobcat 1 and zero-shot figures in this section come from one evaluation
-path (BF16 base with the unmerged adapter, one request at a time) unless a row says
-otherwise. Differences are paired, with 95% bootstrap intervals over source components.
+All Bobcat 1.1 and zero-shot figures in this section come from one evaluation path (BF16
+base with the unmerged adapter, or none for the zero-shot base, one request at a time) unless
+a row says otherwise. The weights in this repository are that adapter merged into the base: on a
+development sample (every 10th decision of the v2 development split, 319 decisions across the six
+tasks) they gave the evaluation path's top answer on all 319 and the same accuracy (298 correct);
+the largest probability change was 0.075 at the calibration temperature. Differences are paired, with 95% bootstrap intervals over source components.
 
 ### Sealed final
 
 A fresh final built from KLUE MRC contexts and Wizard of Seoul dialogues that no
-evaluation split, earlier final or training build had used. Classification and tool-call
+evaluation split, other final or training build had used. Classification and tool-call
 review could not be rebuilt without reusing text, so this final has four tasks. The
 release manifest binding the base revision, tokenizer, adapter hash, temperature and
 decision rule was frozen before the split was opened, once per model.
 
-| Task (decisions) | Bobcat 1.1 | Bobcat 1 | Same base, zero-shot |
-|---|---:|---:|---:|
-| Search passage selection (500) | **80.6%** | 79.2% | 74.2% |
-| Citation verification (103) | 100.0% | 99.0% | 93.2% |
-| External document screening (550) | **96.9%** | 96.5% | 86.0% |
-| Request routing (461) | 99.6% | 99.6% | 98.0% |
-| **Task macro** | **94.27%** | 93.59% | 87.86% |
-| NLL / ECE after temperature | 0.334 / 0.012 | 0.350 / 0.017 | 0.545 / 0.051 |
+| Task (decisions) | Bobcat 1.1 | Same base, zero-shot |
+|---|---:|---:|
+| Search passage selection (500) | **80.6%** | 74.2% |
+| Citation verification (103) | **100.0%** | 93.2% |
+| External document screening (550) | **96.9%** | 86.0% |
+| Request routing (461) | **99.6%** | 98.0% |
+| **Task macro** | **94.27%** | 87.86% |
+| NLL / ECE after temperature | 0.334 / 0.012 | 0.545 / 0.051 |
 
-Bobcat 1.1 minus Bobcat 1: +0.7 points [-0.0, +1.5]; minus zero-shot: +6.4 [+4.8, +8.1].
-51 routing questions share Wizard of Seoul utterances with a compared model's training
-data (46 with Bobcat 1.1's); without them the macro is 94.26% and the difference from
-Bobcat 1 is +0.7 [+0.0, +1.5]. No request failed. The evaluation is Korean and no label has been reviewed by
+Bobcat 1.1 minus zero-shot: +6.4 points [+4.8, +8.1]. 46 routing questions share Wizard of
+Seoul utterances with this adapter's training data; without the 51 that overlap any training
+data used in this family of models, the macro is 94.26% (zero-shot 87.80%) and the difference
+is +6.5 [+4.9, +8.0]. No request failed. The evaluation is Korean and no label has been reviewed by
 a person.
 
-**Selection history.** A first 1.1 candidate, trained on the same data without the SQuAD
-and option-order continuation, opened an earlier fresh final once (95.27%, equal to Bobcat
-1 on those 1,956 decisions). It then regressed slightly on the English SemIf sets, so the
-released adapter continued from it on SQuAD 2.0 answer/no-answer pairs, English
-option-order permutations and replay. It replaced the first candidate only because it met
-all four conditions of a rule written down before its data existed (SemIf mean, dev macro,
-injection and 30K limits), and it then opened the final above once.
+**How the adapter was selected.** A first candidate, trained on the stage-1 data alone,
+opened another fresh final once (1,956 decisions: 95.27%, same base zero-shot 86.69%). It
+then scored slightly lower on the English SemIf sets, so the released adapter continued from
+it (stage 2 below). It replaced the first candidate only because it met all four conditions
+of a rule written down before its data existed (SemIf mean, development macro, injection and
+30K limits), and it then opened the final above once.
 
 ### Six-task development evaluation
 
@@ -281,18 +239,19 @@ The v2 development split (3,188 Korean decisions from KLUE and Wizard of Seoul, 
 catalog of tool-call situations). It was used to select the adapter, so it is not a
 held-out test.
 
-| Task | Bobcat 1.1 | Bobcat 1 | Same base, zero-shot |
-|---|---:|---:|---:|
-| Search passage selection | 91.1% | 92.2% | 81.7% |
-| Citation verification | 99.6% | 99.8% | 94.0% |
-| Tool-call review, never trained | 94.5% | 95.0% | 81.8% |
-| External document screening | 96.9% | 96.5% | 87.1% |
-| Request routing | 99.4% | 99.3% | 98.5% |
-| Classification | **80.6%** | 77.6% | 69.8% |
-| **Task macro** | **93.69%** | 93.41% | 85.48% |
+| Task | Bobcat 1.1 | Same base, zero-shot |
+|---|---:|---:|
+| Search passage selection | **91.1%** | 81.7% |
+| Citation verification | **99.6%** | 94.0% |
+| Tool-call review, never trained | **94.5%** | 81.8% |
+| External document screening | **96.9%** | 87.1% |
+| Request routing | **99.4%** | 98.5% |
+| Classification | **80.6%** | 69.8% |
+| **Task macro** | **93.69%** | 85.48% |
 
-Tool-call review, a task never trained, differs from Bobcat 1 by -0.6 points [-4.8, +3.2].
-After temperature, development NLL is 0.218 and ECE 0.010.
+Bobcat 1.1 minus zero-shot: +8.2 points [+6.8, +9.4], including +12.7 on tool-call review, a
+task it was never trained on. After temperature, development NLL is 0.218 and ECE 0.010
+(zero-shot: 0.504 and 0.045).
 
 ### Wrong answers named inside the state
 
@@ -300,10 +259,10 @@ After temperature, development NLL is 0.218 and ECE 0.010.
 instruction inside the text, and an administrator "final verdict". Attack success counts
 the attacked questions whose answer moved to the named wrong answer.
 
-| | Bobcat 1.1 | Bobcat 1 | Same base, zero-shot |
-|---|---:|---:|---:|
-| **Attack success, all three** | **7.8%** | 39.6% | 21.0% |
-| Accuracy, clean input | 93.7% | 92.7% | 85.7% |
+| | Bobcat 1.1 | Same base, zero-shot |
+|---|---:|---:|
+| **Attack success, all three** | **7.8%** | 21.0% |
+| Accuracy, clean input | **93.7%** | 85.7% |
 
 Per attack, Bobcat 1.1's success is 7.3% (verdict), 8.0% (inside the text) and 8.0% (note);
 it is 0% on search, citation, tool-call review, routing and classification. The external
@@ -317,11 +276,11 @@ with the state, the exact questions, the answers of Claude Opus 5, GPT-5.6 Sol a
 reference answers from GPT-6 Astra and Claude Fable 5.1. We sent the same requests to Bobcat
 and scored every model with the same code on the 329 questions all four answered.
 
-| | Bobcat 1.1 | Bobcat 1 | Jev | Claude Opus 5 | GPT-5.6 Sol |
+| | Bobcat 1.1 | Same base, zero-shot | Jev | Claude Opus 5 | GPT-5.6 Sol |
 |---|---:|---:|---:|---:|---:|
-| Agreement with the reference, all questions | 92.1% | 92.4% | 90.9% | 92.4% | 93.0% |
-| Agreement, mean of the four workflows | 87.3% | 88.0% | 86.5% | 88.2% | 89.6% |
-| Probability on the reference answer | 0.890 | 0.888 | 0.850 | 0.851 | 0.914 |
+| Agreement with the reference, all questions | 92.1% | 86.9% | 90.9% | 92.4% | 93.0% |
+| Agreement, mean of the four workflows | 87.3% | 84.1% | 86.5% | 88.2% | 89.6% |
+| Probability on the reference answer | 0.890 | 0.756 | 0.850 | 0.851 | 0.914 |
 | Served (NVFP4, HTTP), agreement / median time per case | 91.2% / 0.52-0.58 s | | 90.9% / 0.42 s | 92.4% / 20.9 s | 93.0% / 24.2 s |
 
 Bobcat 1.1 minus Jev, averaged over workflows, is +0.9 points (95% interval -4.4 to +8.6):
@@ -337,16 +296,17 @@ evaluators, plus the Jev figures TypeSafe released for 102 rows aligned to its w
 cases. We converted the rows to Bobcat requests and scored them with SemIf's unmodified
 evaluators.
 
-| Set (metric) | Bobcat 1.1 | Bobcat 1 | Same base, zero-shot | Jev (published) |
-|---|---:|---:|---:|---:|
-| authored144 (mean family balanced accuracy) | 0.910 | 0.911 | 0.876 | - |
-| perturbations108 | 0.989 | 1.000 | 0.924 | - |
-| WANLI256 | 0.730 | 0.738 | 0.738 | - |
-| TypeSafe102 modal agreement / total variation | 0.872 / 0.130 | 0.847 / 0.116 | 0.820 / 0.194 | **0.883** / 0.127 |
-| Every judge-grid (36 cells) | 32 | 31 | 29 | 32 |
-| Every action-firewall (10 actions) | 9 | 10 | 10 | 10 |
+| Set (metric) | Bobcat 1.1 | Same base, zero-shot | Jev (published) |
+|---|---:|---:|---:|
+| authored144 (mean family balanced accuracy) | 0.910 | 0.876 | - |
+| perturbations108 | 0.989 | 0.924 | - |
+| WANLI256 | 0.730 | 0.738 | - |
+| TypeSafe102 modal agreement / total variation | 0.872 / 0.130 | 0.820 / 0.194 | **0.883** / 0.127 |
+| Every judge-grid (36 cells) | 32 | 29 | 32 |
+| Every action-firewall (10 actions) | 9 | 10 | 10 |
 
-Jev is ahead on TypeSafe102 modal agreement and the action firewall. These sets are
+Jev is ahead on TypeSafe102 modal agreement and the action firewall, and the untrained base
+is level or ahead on WANLI256 and the action firewall. These sets are
 evaluation-only; none of their rows was used for training, selection or calibration.
 
 ### Long inputs
@@ -354,13 +314,13 @@ evaluation-only; none of their rows was used for training, selection or calibrat
 The development tasks with the state padded by unrelated passages (300 questions, drawn
 per task). Change in accuracy against the unpadded state:
 
-| State length | Bobcat 1.1 | Bobcat 1 |
+| State length | Bobcat 1.1 | Same base, zero-shot |
 |---|---|---|
-| Unpadded (accuracy) | 93.7% | 93.7% |
-| 8K tokens | 0.0 [-1.9, +1.9] | -1.0 |
-| 16K tokens | -2.7 [-5.0, -0.4] | -2.0 |
-| 30K tokens | **-1.7 [-4.0, +0.7]** | -2.3 [-4.3, -0.3] |
-| 60K tokens (evaluation path only) | -1.0 [-2.9, +1.0] | -2.3 |
+| Unpadded (accuracy) | 93.7% | 86.3% |
+| 8K tokens | 0.0 [-1.9, +1.9] | -0.3 |
+| 16K tokens | -2.7 [-5.0, -0.4] | -2.3 |
+| 30K tokens | **-1.7 [-4.0, +0.7]** | -4.0 |
+| 60K tokens (evaluation path only) | -1.0 [-2.9, +1.0] | -4.3 |
 
 Per task (50 questions each), the drop at 30K is largest in classification (80% to 72%) and search
 (98% to 94%).
@@ -375,9 +335,9 @@ Per task (50 questions each), the drop at 30K is largest in classification (80% 
 | Throughput, 32 to 512 concurrent 1K-token requests | 19,207-19,614 tokens/s |
 | TypeSafe workflow case, median, served over HTTP (localhost, `--schedule all`) | 0.576 s / 0.515 s (two passes) |
 
-Bobcat 1 in FP8 on the same GPU and engine takes 57.5 ms for the first profile; the merged
-1.1 model has the same architecture and shapes. Latency under concurrent HTTP load has not
-been measured.
+In FP8 (option B), the fresh-install server took 0.86 s per TypeSafe workflow case on the
+same GPU; the FP8 engine profile was not measured separately. Latency under concurrent HTTP
+load has not been measured.
 
 ### Serving precision
 
@@ -394,17 +354,21 @@ on 98.2%). Evaluate the exact artifact you serve.
   output head are frozen.
 - **Stage 1:** one epoch over 81,432 decisions (87.5M tokens), 2,545 steps of 32
   questions, AdamW at 1e-4, on eight NVIDIA B300 GPUs. Loss: cross-entropy on the candidate
-  softmax for Choice and Noul, expected-level error for Score (the Bobcat 1 recipe).
+  softmax for Choice and Noul, expected-level error for Score.
 - **Stage 2:** 313 steps at 2e-5 from stage 1 on 10,000 decisions: 4,000 SQuAD 2.0
   answer-stated / not-stated pairs on the same passage, 3,000 English Choice questions with
   permuted options, and 3,000 replayed stage-1 decisions.
 - **Calibration:** one temperature, 1.2008, fitted on the held-out calibration split
   (1,605 decisions).
+- **Merge:** the adapter (`adapter_model.safetensors` sha256 `7351d959…83b2`) merged into the
+  base with `bobcat.student_merge`: each adapted weight becomes `bf16(W + (alpha/r) B A)` with
+  the product and sum in float32, and every other tensor is copied. The shard hashes are in
+  `SHA256SUMS.json` and in the release manifest (`serving_builds.merged_bf16`).
 - **Data (stage 1):**
 
   | Part | Decisions | Korean | English |
   |---|---:|---:|---:|
-  | Product tasks (KLUE MRC, Wizard of Seoul; the Bobcat 1 training split) | 25,104 | 25,104 | 0 |
+  | Product tasks (KLUE MRC and Wizard of Seoul training components) | 25,104 | 25,104 | 0 |
   | Policy transfer (synthetic rules with exact interpreters) | 8,374 | 5,335 | 3,039 |
   | Public labelled data (KorNLI; KLUE NLI, YNAT, STS; NSMC; MASSIVE; Banking77; BoolQ; ARC; HelpSteer 2 and 3; SNLI) | 32,154 | 11,184 | 20,970 |
   | Injected-answer counterfactuals (gold unchanged) | 8,100 | 6,693 | 1,407 |
@@ -417,12 +381,12 @@ on 98.2%). Evaluate the exact artifact you serve.
   for training, distillation, reward or calibration**, and no SemIf, Every or TypeSafe
   evaluation row was used. Rows whose text appears in any development, calibration or final
   split were removed before training. Tool-call review was never trained. 2,231 KorNLI rows
-  are machine translations (as in Bobcat 1); no new machine-translated data was added.
+  are machine translations; no other machine-translated data was used.
 
 ## Limitations and risks
 
 - **Insufficient evidence stays weak.** On SemIf's WANLI256, Bobcat 1.1 recognises 27 of
-  85 "insufficient" rows (Bobcat 1: 39 of 85); on the 36 SemIf rows whose evidence was
+  85 "insufficient" rows (the untrained base: 58 of 85); on the 36 SemIf rows whose evidence was
   removed it makes 9 errors, 5 of them at a confidence of 0.8 or more. It leans towards a
   definite answer when the evidence is related but does not settle the question. Give it
   an explicit "not stated" option and do not treat a confident answer as proof that the
@@ -436,8 +400,7 @@ on 98.2%). Evaluate the exact artifact you serve.
   reproducible.
 - An attack sentence inside the state still moves 7.8% of answers. For untrusted input,
   add checks outside the model.
-- Order and wording: reversing the option order flipped 1 of SemIf's perturbation rows
-  (Bobcat 1: 0).
+- Order and wording: reversing the option order flipped 1 of SemIf's perturbation rows.
 - The sealed finals have no classification rows, and the second has no tool-call rows;
   classification and tool-call review rest on the development split. The finals and the
   development split are Korean; English results come from TypeSafe's 20 cases, SemIf and
@@ -454,8 +417,9 @@ Bobcat for safety-critical or legal decisions.
 
 ## License and attribution
 
-The adapter is released under Apache-2.0 and is a derivative of Qwen3.8-27B by the Qwen
-team (Apache-2.0); see the base model's license. Training data keep their own licenses:
+These weights are released under Apache-2.0 as a derivative of Qwen3.8-27B by the Qwen team
+(Apache-2.0); the Qwen LICENSE file is included unchanged, and `NOTICE` lists what was
+changed. Training data keep their own licenses:
 KLUE, KorNLI, ARC, SNLI and SQuAD 2.0 (CC BY-SA 4.0), BoolQ (CC BY-SA 3.0), NSMC (CC0 1.0),
 MASSIVE, Banking77 and HelpSteer 2 and 3 (CC BY 4.0). Attributions are in the code
 repository's `THIRD_PARTY.md`.
@@ -463,20 +427,12 @@ repository's `THIRD_PARTY.md`.
 Bobcat is an independent project. It is not affiliated with or endorsed by TypeSafe AI, the
 Qwen team, Anthropic, OpenAI, Every or any other company named here; product names are
 their owners' trademarks and are used only to identify the models compared. TypeSafe's and
-SemIf's evaluation data are not redistributed here. The adapter is provided as is, without
+SemIf's evaluation data are not redistributed here. The weights are provided as is, without
 warranty.
 
 ## Citation
 
 ```bibtex
-@techreport{bobcat2026,
-  title       = {Bobcat: Typed Decisions from One Forward Pass},
-  author      = {{The Bobcat Authors}},
-  institution = {Foxl AI},
-  year        = {2026},
-  url         = {https://foxl.ai/blog/bobcat-typed-decisions}
-}
-
 @misc{bobcat11,
   title        = {Bobcat 1.1},
   author       = {{The Bobcat Authors}},

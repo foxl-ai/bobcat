@@ -10,7 +10,7 @@ from bobcat import api_server  # noqa: E402
 from bobcat.output_contract_audit import inspect_reply  # noqa: E402
 from bobcat.student_readout import StudentCompiler  # noqa: E402
 
-MODELS = [{"name": "bobcat-1", "description": "d", "release_date": "2026-09-25"}]
+MODELS = [{"name": "bobcat-1.1", "description": "d", "release_date": "2026-09-25"}]
 
 
 class FakeEngine:
@@ -31,7 +31,7 @@ def client(tmp_path, engine=None, **options):
     pinned = student(tmp_path)
     compiler = StudentCompiler(tmp_path, pinned, ["A", "B", "C"], max_branch_tokens=4096,
                                piecewise=True)
-    app = api_server.create_api(engine or FakeEngine(), compiler, model_name="bobcat-1",
+    app = api_server.create_api(engine or FakeEngine(), compiler, model_name="bobcat-1.1",
                                 aliases={"bobcat-latest"}, temperature=1.0, models=MODELS,
                                 **{"edge_secret": "s3cret", **options})
     return TestClient(app), compiler
@@ -49,7 +49,7 @@ def test_decisions_follow_the_published_wire_contract(tmp_path):
     body = payload()
     reply = api.post("/v1/systemone", json=body, headers={"x-bobcat-edge-secret": "s3cret"})
     assert reply.status_code == 200
-    inspect_reply(body, reply, expected_model="bobcat-1")
+    inspect_reply(body, reply, expected_model="bobcat-1.1")
     result = reply.json()
     assert result["answers"]["q"]["choice"] == "y"
     assert result["usage"]["output_tokens"] == 0
@@ -239,11 +239,11 @@ def test_state_is_encoded_once_per_request(tmp_path):
     compiler._data = counting
     api_server.cache_state_encoding(compiler)
     engine = FakeEngine()
-    app = api_server.create_api(engine, compiler, model_name="bobcat-1", aliases=set(),
+    app = api_server.create_api(engine, compiler, model_name="bobcat-1.1", aliases=set(),
                                 temperature=1.0, models=MODELS, edge_secret=None)
     api = TestClient(app)
     state = {"doc": "one long document", "n": 7}
-    body = {"model": "bobcat-1", "state": state, "questions": many_questions(5)}
+    body = {"model": "bobcat-1.1", "state": state, "questions": many_questions(5)}
     assert api.post("/v1/systemone", json=body).status_code == 200
     assert calls == [_dumps_key(state)]            # five questions, one state encoding
     assert api.post("/v1/systemone", json=body).status_code == 200
@@ -274,14 +274,14 @@ def test_server_sends_the_same_token_ids_with_and_without_the_cache(tmp_path):
             api_server.cache_state_encoding(compiler)
         engine = SequenceEngine()
         api = TestClient(api_server.create_api(
-            engine, compiler, model_name="bobcat-1", aliases=set(), temperature=1.3,
+            engine, compiler, model_name="bobcat-1.1", aliases=set(), temperature=1.3,
             models=MODELS, edge_secret=None))
         got = []
         for state in STATES:
-            body = {"model": "bobcat-1", "state": state, "questions": many_questions(3)}
+            body = {"model": "bobcat-1.1", "state": state, "questions": many_questions(3)}
             reply = api.post("/v1/systemone", json=body)
             assert reply.status_code == 200
-            inspect_reply(body, reply, expected_model="bobcat-1")
+            inspect_reply(body, reply, expected_model="bobcat-1.1")
             got.append((reply.json(), reply.headers["x-bobcat-processed-tokens"]))
         replies.append(got)
         calls.append(engine.calls)
@@ -294,7 +294,7 @@ def test_questions_stay_isolated_with_the_state_cache(tmp_path):
     reference = char_student(tmp_path / "ref")
     engine = SequenceEngine()
     api = TestClient(api_server.create_api(
-        engine, compiler, model_name="bobcat-1", aliases=set(), temperature=1.0,
+        engine, compiler, model_name="bobcat-1.1", aliases=set(), temperature=1.0,
         models=MODELS, edge_secret=None))
     state = {"doc": "shared state"}
     a = {"type": "noul", "instructions": "is it shared?"}
@@ -302,7 +302,7 @@ def test_questions_stay_isolated_with_the_state_cache(tmp_path):
     c = {"type": "score", "instructions": "how much", "criteria": ["low", "mid", "high"]}
     answers = []
     for questions in ({"a": a}, {"a": a, "b": b}, {"b": b, "a": a, "c": c}):
-        reply = api.post("/v1/systemone", json={"model": "bobcat-1", "state": state,
+        reply = api.post("/v1/systemone", json={"model": "bobcat-1.1", "state": state,
                                                 "questions": questions})
         assert reply.status_code == 200
         answers.append(reply.json()["answers"]["a"])
@@ -320,7 +320,7 @@ def test_questions_stay_isolated_with_the_state_cache(tmp_path):
                      if reference._text(t) and _contains(sequence, reference._text(t))]
             assert len(texts) == 1
     # A new state after a cached one: the sequences carry the new state's tokens only.
-    reply = api.post("/v1/systemone", json={"model": "bobcat-1", "state": {"doc": "new one"},
+    reply = api.post("/v1/systemone", json={"model": "bobcat-1.1", "state": {"doc": "new one"},
                                             "questions": {"a": a}})
     assert reply.status_code == 200
     _, (fresh,) = parse_request({"model": "m", "state": {"doc": "new one"},

@@ -21,8 +21,8 @@ profile separately from the model that produced the probability distribution.
 
 The original `zai-org/GLM-5.3-Flash` weights, revision
 `eb9eb208eb0d988989d07a6a12d0fdeb5f52574a`, have been downloaded and checksum
-verified for the reference experiments. Bobcat 1 is not derived from GLM weights; they
-served as a quality reference and in earlier comparison experiments only.
+verified for the reference experiments. Bobcat 1.1 and Bobcat Flash 1.1 are not derived
+from GLM weights; they served as a quality reference and in comparison experiments only.
 
 The exact upstream MIT notice is preserved in
 [`licenses/GLM-5.3-Flash-MIT.txt`](licenses/GLM-5.3-Flash-MIT.txt).
@@ -150,27 +150,26 @@ TypeSafe's proprietary architecture, reward function, or training loop.
 
 ## Qwen3.8-27B base model
 
-Bobcat 1 and Bobcat 1.1 are LoRA adapters for `Qwen/Qwen3.8-27B`, revision
-`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`, released by the Qwen team under the
-Apache License 2.0. The adapters are derivatives of that model and are released under
-the same license. Its weights are not redistributed here; the serving recipe
-downloads them from the upstream repository at the pinned revision.
+Bobcat 1.1 is a LoRA adapter trained on `Qwen/Qwen3.8-27B`, revision
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`, released by the Qwen team under the Apache
+License 2.0, and is published merged into that model (BF16, and an NVFP4 build). The
+weights are derivatives of the base model and are released under the same license, with
+the upstream LICENSE file and a NOTICE in each Hugging Face repository.
 
 ## Gemma 4 26B-A4B base model
 
-Bobcat Flash 1.1 is a LoRA adapter for `google/gemma-4-26B-A4B-it`, revision
+Bobcat Flash 1.1 is a LoRA adapter trained on `google/gemma-4-26B-A4B-it`, revision
 `4d7ae4984b7db7de8f8457170b3f1a419ee76d52`, released by Google DeepMind. That revision's
 model card declares `license: apache-2.0` and links the
 [Gemma 4 license](https://ai.google.dev/gemma/docs/gemma_4_license) page, which is the
-Apache License 2.0 text (checked 2026-09-26). The adapter is a derivative of that model and
-is released under the same license. Its weights are not redistributed here; the serving
-recipe downloads them from the upstream repository at the pinned revision. Bobcat Flash
-was distilled from Bobcat 1 and a Bobcat 1.1 candidate (both Apache-2.0 derivatives of
-Qwen3.8-27B); no Jev output was used.
+Apache License 2.0 text (checked 2026-09-26). It is published merged into that model (BF16);
+the weights are a derivative of the base model and are released under the same license, with
+the license text and a NOTICE in the Hugging Face repository. Bobcat Flash was distilled from
+Bobcat adapters of Qwen3.8-27B (Apache-2.0); no Jev output was used.
 
 ## Further training data
 
-In addition to the sources above, Bobcat 1's training decisions draw on the
+In addition to the sources above, Bobcat 1.1's training decisions draw on the
 following public data. Each keeps its own license and attribution; the derived
 decisions are not relicensed.
 
@@ -184,7 +183,7 @@ decisions are not relicensed.
 - **HelpSteer 2 and 3:** Wang et al. (2024, 2025), NVIDIA, CC BY 4.0. Only the mean
   attribute ratings are used, as observed means.
 
-Bobcat 1.1 adds (derived decisions keep each source's license and attribution):
+Also used for Bobcat 1.1 (derived decisions keep each source's license and attribution):
 
 - **SNLI:** Bowman et al. (2015), *A large annotated corpus for learning natural language
   inference*, Stanford NLP, CC BY-SA 4.0 (`stanfordnlp/snli`, revision `cdb5c3d5`).

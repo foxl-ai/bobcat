@@ -1,0 +1,15 @@
+Bobcat 1.1 (sanghwa-na/bobcat-1.1)
+Copyright 2026 The Bobcat Authors
+
+These weights are the Bobcat 1.1 LoRA adapter merged into Qwen3.8-27B (Qwen/Qwen3.8-27B,
+revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0, by the Qwen team) and stored in BF16.
+
+Qwen3.8-27B is licensed under the Apache License, Version 2.0. Its LICENSE file is included
+here unchanged as LICENSE, and this derivative is released under the same license. The
+tokenizer, vocabulary, chat template, processor and configuration files are the Qwen team's,
+unchanged. The files under compiler/ are the base model's tokenizer, chat template and
+configuration at the pinned revision, with the download receipt the Bobcat compiler checks.
+
+The adapter's training data keep their own licenses; see THIRD_PARTY.md in
+https://github.com/foxl-ai/bobcat. Bobcat is an independent project and is not affiliated
+with or endorsed by the Qwen team.

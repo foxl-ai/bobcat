@@ -1,5 +1,5 @@
-"""Teacher logits for the Bobcat Flash corpus: Bobcat 1 (merged, vLLM) at the first answer
-position of every compiled row (2026-09-26).
+"""Teacher logits for the Bobcat Flash corpus: a merged Qwen3.8-27B student (vLLM) at the first
+answer position of every compiled row (2026-09-26).
 
 Runs in the vLLM venv, one process per GPU (`--shard i --shards n` over the rows by a stable
 hash of the row ID). Each row's raw identifier logits are read with `logprob_token_ids`

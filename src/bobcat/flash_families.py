@@ -2,7 +2,7 @@
 
 Every family builds requests on the System One wire shape (`protocol.parse_request`) in
 Korean and English. Some have an exact gold answer from the generator (games and rule-based
-workflow checks); the rest are labelled only by the teacher (Bobcat 1 probabilities).
+workflow checks); the rest are labelled only by the teacher (its probabilities).
 Rules kept here:
   * no tool-call review questions (the held-out task stays held out);
   * no TypeSafe, SemIf or Every rows, wording or cases; public text comes from the prepared

@@ -1,4 +1,4 @@
-"""Bobcat Flash student training: gold SFT + distillation on Bobcat 1 probabilities (2026-09-26).
+"""Bobcat Flash student training: gold SFT + distillation on teacher probabilities (2026-09-26).
 
 Inputs are rows compiled by `flash_data compile` (or `student_readout compile --piecewise` for
 evaluation splits): token IDs, the offered identifier IDs, and supervision. The student is read
@@ -7,9 +7,9 @@ offered identifiers (Gemma's final logit soft-cap included). Nothing is generate
 
 Loss per question (mean over the questions of a global step):
   kd    KL(p_teacher || q_student) over the offered candidates, p_teacher = softmax(z_T / T_T)
-        with T_T = Bobcat 1's calibration temperature (1.1489) unless --teacher-temperature;
+        with T_T = teacher A's calibration temperature (1.1489) unless --teacher-temperature;
   gold  cross-entropy for hard labels; for Score means the normalised squared error of the
-        expected level (the Bobcat 1 recipe).
+        expected level (the `student_train` recipe).
   total = kd_weight * kd (when a teacher row exists) + gold_weight * gold (when gold exists).
 Rows are right-padded into token-budget micro-batches of similar length (causal attention and
 causal linear attention never look right, so padding cannot change the last real position).

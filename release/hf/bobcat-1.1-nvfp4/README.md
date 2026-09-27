@@ -27,10 +27,10 @@ limitations and the full license notes are on the main card,
 [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1).**
 
 This repository, `sanghwa-na/bobcat-1.1-nvfp4`, is the exact NVFP4 checkpoint we measured and
-served: the Bobcat 1.1 adapter merged into Qwen3.8-27B, then quantized to NVFP4 (4-bit
+served: the BF16 weights of [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1), quantized to NVFP4 (4-bit
 weights and activations). It needs an NVIDIA Blackwell GPU (FP4 tensor cores); we measured it
-on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0. For other GPUs, merge the adapter and
-serve it in FP8 as the main card's quickstart describes.
+on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0. For other GPUs, serve the BF16 weights
+of the main repository in FP8, as its quickstart describes.
 
 ## Serve
 
@@ -91,12 +91,12 @@ took 0.52-0.58 s per case served over localhost HTTP.
 from a cached shared prefix and the same question computed from scratch agreed on 61 of 64
 boundary questions (95.3%; FP8: 64 of 64), and the served NVFP4 model agreed with TypeSafe's
 reference on 91.2% of the workflow questions against 92.1% on the evaluation path. Where a
-near-tie must be reproducible, serve the adapter merged in FP8 (main card).
+near-tie must be reproducible, serve the main repository's BF16 weights in FP8.
 
 ## Provenance
 
-- **Adapter:** Bobcat 1.1, `adapter_model.safetensors` sha256 `7351d959…83b2`, released at
-  [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1).
+- **Weights:** the Bobcat 1.1 LoRA (`adapter_model.safetensors` sha256 `7351d959…83b2`)
+  merged into the base, as in [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1).
 - **Base:** Qwen3.8-27B at revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`.
 - **Merge:** `bobcat.student_merge`: each adapted weight becomes `bf16(W + (alpha/r) B A)`
   with the product and sum in float32; every other tensor is copied.
@@ -110,7 +110,7 @@ near-tie must be reproducible, serve the adapter merged in FP8 (main card).
   `model_mtp.safetensors` `1d8268aa…9da9fe`, as recorded in the release manifest
   (`bobcat-release-manifest.json`, `serving_builds.nvfp4`); every file is listed in
   `SHA256SUMS.json`.
-- No output of Jev or of any other teacher model was used to train the adapter; see the main
+- No output of Jev or of any other teacher model was used to train Bobcat 1.1; see the main
   card.
 
 ## License and attribution

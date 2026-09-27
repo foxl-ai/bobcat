@@ -1,6 +1,6 @@
 {
   "schema": "bobcat-flash-arms-v1",
-  "note": "Bobcat Flash training arms (2026-09-26). Every arm: Flash corpus v1 (gold + Bobcat 1 teacher probabilities, T_teacher 1.1489), piecewise compile, first-position identifier readout. Selection on dev/calibration only.",
+  "note": "Bobcat Flash training arms (2026-09-26). Every arm: Flash corpus v1 (gold + teacher A probabilities, T_teacher 1.1489), piecewise compile, first-position identifier readout. Selection on dev/calibration only.",
   "arms": {
     "g26_lora": {
       "repo": "google/gemma-4-26B-A4B-it",
@@ -89,7 +89,7 @@
       "packable": false,
       "init_arm": "g26_lora",
       "train_source": "bobcat1_mixture",
-      "note": "continuation of g26_lora on the Bobcat 1 mixture rows only (gold + KD), the Bobcat 1 recipe on top of the broad distillation"
+      "note": "continuation of g26_lora on the base mixture rows only (gold + KD), the 27B student recipe on top of the broad distillation"
     },
     "e4b_mix": {
       "repo": "google/gemma-4-E4B-it",
@@ -105,7 +105,7 @@
       "packable": false,
       "init_arm": "e4b_full",
       "train_source": "bobcat1_mixture",
-      "note": "continuation of e4b_full on the Bobcat 1 mixture rows only"
+      "note": "continuation of e4b_full on the base mixture rows only"
     },
     "g26_b11": {
       "repo": "google/gemma-4-26B-A4B-it",
@@ -136,7 +136,7 @@
       "packable": false,
       "init_arm": "g26_lora",
       "train_source": "bobcat1_mixture",
-      "note": "g26_mix with Bobcat 1.1 teacher probabilities: continuation of g26_lora on the Bobcat 1 mixture rows (gold + Bobcat 1.1 KD)",
+      "note": "g26_mix with Bobcat 1.1 teacher probabilities: continuation of g26_lora on the base mixture rows (gold + Bobcat 1.1 KD)",
       "teacher": "teacher11",
       "teacher_temperature": 1.1884893953889413
     },
@@ -153,7 +153,7 @@
       "packable": false,
       "init_arm": "g26_b11",
       "train_source": "bobcat1_mixture",
-      "note": "g26_b11 then the Bobcat 1 mixture rows with Bobcat 1.1 KD",
+      "note": "g26_b11 then the base mixture rows with Bobcat 1.1 KD",
       "teacher": "teacher11",
       "teacher_temperature": 1.1884893953889413
     },
@@ -170,7 +170,7 @@
       "packable": true,
       "init_arm": "q17_full",
       "train_source": "bobcat1_mixture",
-      "note": "continuation of q17_full on the Bobcat 1 mixture rows only (gold + Bobcat 1 KD)"
+      "note": "continuation of q17_full on the base mixture rows only (gold + teacher A KD)"
     },
     "q4_mix": {
       "repo": "Qwen/Qwen3-4B-Instruct-2507",
@@ -185,7 +185,7 @@
       "packable": true,
       "init_arm": "q4_full",
       "train_source": "bobcat1_mixture",
-      "note": "continuation of q4_full on the Bobcat 1 mixture rows only (gold + Bobcat 1 KD)"
+      "note": "continuation of q4_full on the base mixture rows only (gold + teacher A KD)"
     }
   },
   "release": {

@@ -458,8 +458,8 @@ def main():
     parser.add_argument("--adapter", type=Path, help="LoRA folder (transformers engine)")
     parser.add_argument("--quantization", choices=["none", "fp8"], default="none")
     parser.add_argument("--temperature", type=float, required=True)
-    parser.add_argument("--name", default="bobcat-1")
-    parser.add_argument("--release-date", default="2026-09-25")
+    parser.add_argument("--name", default="bobcat-1.1")
+    parser.add_argument("--release-date", default="2026-09-26")
     parser.add_argument("--identifiers", type=Path,
                         default=Path("reports/2026-09-22-glm-readout-preflight.json"))
     parser.add_argument("--host", default="0.0.0.0")

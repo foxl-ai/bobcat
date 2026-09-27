@@ -46,8 +46,8 @@ def main():
                                     json.loads(args.identifiers.read_text())["identifiers"])
     compiler = StudentCompiler(args.compiler_model, receipt["files"], identifiers,
                                max_branch_tokens=16384, piecewise=True)
-    models = [{"name": "bobcat-1", "description": "check", "release_date": "2026-09-25"}]
-    app = create_api(StandIn(), compiler, model_name="bobcat-1", aliases={"bobcat-latest"},
+    models = [{"name": "bobcat-1.1", "description": "check", "release_date": "2026-09-25"}]
+    app = create_api(StandIn(), compiler, model_name="bobcat-1.1", aliases={"bobcat-latest"},
                      temperature=1.0, models=models, edge_secret=None)
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))

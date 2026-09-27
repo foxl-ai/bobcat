@@ -3,7 +3,7 @@
   "name": "bobcat-1.1",
   "status": "frozen",
   "frozen_at": "2026-09-26T10:13:35+00:00",
-  "scope": "Bobcat 1.1 (arm r16semif): the r16 adapter continued on SQuAD 2.0 answer-stated pairs, English option-order permutations and replay; replaces r16 as bobcat-1.1 under the rule registered before its data existed; frozen before the second fresh final is opened; Bobcat 1 stays unchanged",
+  "scope": "Bobcat 1.1 (arm r16semif): the r16 adapter continued on SQuAD 2.0 answer-stated pairs, English option-order permutations and replay; replaces r16 as bobcat-1.1 under the rule registered before its data existed; frozen before the second fresh final is opened",
   "output_contract": "Choice / Noul / Score only; host-built closed JSON (SPEC G0); no generated tokens",
   "base": {
     "repo": "Qwen/Qwen3.8-27B",
@@ -64,17 +64,12 @@
       "product_routing",
       "product_search"
     ],
-    "not_available": "product_classification (every KLUE MRC news article with a publisher category was used by Bobcat 1 training) and product_tool_call (every written tool catalog is already used by a split)",
+    "not_available": "product_classification (every KLUE MRC news article with a publisher category was used by an earlier training build) and product_tool_call (every written tool catalog is already used by a split)",
     "authorization": "one evaluation for this manifest; any setting changed after seeing final turns final into development",
     "baseline": "same-input zero-shot Qwen3.8-27B (LoRA at zero), piecewise compile",
     "baseline_temperature": 1.259598169713358,
-    "comparison": {
-      "model": "bobcat-1",
-      "adapter_model_sha256": "2704495d178760769e69ff08327e17c3c529bb108a5be7a1896b15d870f4a0c7",
-      "temperature": 1.1488982760285609
-    },
-    "headline": "task macro accuracy with failed requests counted wrong; paired component bootstrap vs baseline and vs Bobcat 1",
-    "sensitivity": "also reported without the 51 routing rows whose WoS utterance text appears in any compared model's training (Flash corpus / Bobcat 1 mixture 51, Bobcat 1.1 training 46, a subset)"
+    "headline": "task macro accuracy with failed requests counted wrong; paired component bootstrap vs baseline",
+    "sensitivity": "also reported without the 51 routing rows whose WoS utterance text appears in any compared model's training (the Flash corpus 51, Bobcat 1.1 training 46, a subset)"
   },
   "training_data": {
     "mixture_schema": "bobcat-student-mixture-v11",
@@ -405,7 +400,7 @@
     "all_conditions_met": true
   },
   "known_limitations": [
-    "Insufficient-evidence judgments remain weak: WANLI256 insufficient recall 27/85 (Bobcat 1 39/85), 9 errors on the 36 evidence-removed SemIf rows, 5 of them at >= 0.8 confidence",
+    "Insufficient-evidence judgments remain weak: WANLI256 insufficient recall 27/85 (untrained base 58/85), 9 errors on the 36 evidence-removed SemIf rows, 5 of them at >= 0.8 confidence",
     "30K padded state: -1.7 pt on the 300-question development set (target <= 1 pt not met)",
     "Document-screening questions whose inserted attack sentence itself addresses the AI change their gold; attack success there is 30-40% by construction",
     "The fresh finals have no classification rows; the second has no tool-call rows"
@@ -413,11 +408,10 @@
   "final_result": {
     "recorded_after_opening": "2026-09-26T10:33:55Z",
     "frozen_manifest_sha256": "fb3ab9c89e8d1cf2393764d65cdc7155f01aa25cf1093fca2a0f31a23f8c6263",
-    "note": "every field above this block is unchanged from the frozen file the second fresh final was opened with; score_final.py stopped at its tool-call difference (no tool-call rows), so the figures were computed from the same scored rows",
+    "note": "every field above this block is identical to the frozen file the second fresh final was opened with; score_final.py stopped at its tool-call difference (no tool-call rows), so the figures were computed from the same scored rows",
     "task_macro_including_failures": {
       "bobcat-1.1": 0.9427,
       "r16": 0.9403,
-      "bobcat-1": 0.9359,
       "zero-shot base": 0.8786,
       "bobcat-flash-1.1": 0.9221
     },
@@ -433,12 +427,6 @@
         "injection": 0.9636,
         "routing": 0.9957,
         "search": 0.802
-      },
-      "bobcat-1": {
-        "citation": 0.9903,
-        "injection": 0.9655,
-        "routing": 0.9957,
-        "search": 0.792
       },
       "zero-shot base": {
         "citation": 0.932,
@@ -463,20 +451,10 @@
       -0.0025,
       0.0077
     ],
-    "bobcat-1.1_minus_bobcat-1_95ci": [
-      0.0068,
-      -0.0003,
-      0.015
-    ],
     "flash_minus_bobcat-1.1_95ci": [
       -0.0205,
       -0.0304,
       -0.0117
-    ],
-    "flash_minus_bobcat-1_95ci": [
-      -0.0137,
-      -0.0246,
-      -0.0026
     ],
     "calibrated_nll_ece": {
       "bobcat-1.1": {
@@ -486,10 +464,6 @@
       "r16": {
         "nll": 0.3338,
         "ece": 0.0116
-      },
-      "bobcat-1": {
-        "nll": 0.35,
-        "ece": 0.0167
       },
       "zero-shot base": {
         "nll": 0.5449,
@@ -541,10 +515,58 @@
         }
       },
       "status": "a different numerical artifact from the evaluated adapter; its own figures are in the report"
+    },
+    "merged_bf16": {
+      "added_at": "2026-09-27T05:55:00Z",
+      "note": "Additive ready-to-serve checkpoint of the frozen adapter above (to be published as sanghwa-na/bobcat-1.1); the adapter, base revision, tokenizer and every frozen field are unchanged. No sealed final was opened; Jev was not called.",
+      "derived_from": {
+        "adapter_model_sha256": "7351d959b66ec8c425fc95bcc76727a722e9d3f763ad45c90c44d620bec583b2",
+        "base": {
+          "repo": "Qwen/Qwen3.8-27B",
+          "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+        }
+      },
+      "merge": "bobcat.student_merge in the serving environment (vLLM 0.30.0, torch 2.13.0): each of the 496 adapted weights becomes bf16(W + (alpha/r) B A), alpha/r = 2.0, with the product and sum in float32; every other tensor and file of the base is copied (the same path as the FP8 serving merge and the NVFP4 build's source)",
+      "dtype": "bfloat16",
+      "files_sha256": {
+        "model-00001-of-00018.safetensors": "a56f7aaf2232ff231470a6ac429c5b9b9e503f4a7d94f1b7d9747ce9c3278c09",
+        "model-00002-of-00018.safetensors": "5bcadd29bb89c74e0996a8cb2e91242a7b067816fad04b83bc08e5a9da0d2b01",
+        "model-00003-of-00018.safetensors": "2e1bf62cbcd406eaa64b60d10353e1f0ef4039d0976e56f05cabe953454f9968",
+        "model-00004-of-00018.safetensors": "0a301398971f7f372501068b6d67baea70300f3e52988be359a639d7b1ed93e7",
+        "model-00005-of-00018.safetensors": "f6d766f19c5518524606599fde0fbd82f0989df96086ce1e96b82cd2620279fd",
+        "model-00006-of-00018.safetensors": "0a7e54cc51ea491598d9d52db09c2a6eb680992c1273c95ab85c10546c1309c4",
+        "model-00007-of-00018.safetensors": "63cfc005503b0c63750e9abf13df6a72244151a9040f66b1d1cce4059addb622",
+        "model-00008-of-00018.safetensors": "088b63b684edfc21ef476ed196012f2f3732d1e513c98405c32e46950e839d72",
+        "model-00009-of-00018.safetensors": "81ab33b853145e6641a021f1da335a366e61ccf7504d671cb832b8e80b355453",
+        "model-00010-of-00018.safetensors": "bad4dd5f004081b1e1392444f22a42787f7a5255218387383693124c50b5a2f9",
+        "model-00011-of-00018.safetensors": "aef06a06251c71d689ac25e362d3d29ce42ee7af065d71aed14b2b890e3f78b9",
+        "model-00012-of-00018.safetensors": "1c0213e5fe589645e44239ab675beb35a8b13cc1c1ee7944e90930c1bd6d6e99",
+        "model-00013-of-00018.safetensors": "49f4e508afc7885d8df95f98eba5b6128f46705f1d3baff66493549bc98de1d8",
+        "model-00014-of-00018.safetensors": "03d13c5e9e3683838961eb383ac0d4d115cf5f7b59718059e6ff6561efb95e92",
+        "model-00015-of-00018.safetensors": "6f1996454884d20d3085baeae344ec9d7ff7dffc82125d833b96f1053f265fab",
+        "model-00016-of-00018.safetensors": "1990230e32aa03aa1efb8c8c72789f787cc54d069c8a25553e6af43d01338367",
+        "model-00017-of-00018.safetensors": "2d4333a0829acc68745b4386ab782b798eeefbd9a917c78546c2800fcb97b01d",
+        "model-00018-of-00018.safetensors": "1d3479509e21494658f9b64d317f5ea8e55c4025d28c702d6c4d0b356ce8ea06",
+        "model.safetensors.index.json": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+        "config.json": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab"
+      },
+      "serving": "vLLM 0.30.0 loads it with --quantization fp8 (online dynamic FP8)",
+      "equivalence_to_adapter_path": {
+        "sample": "every 10th row of the compiled product-eval v2 dev split (319 decisions)",
+        "paths": "BF16 base + unmerged LoRA (bobcat.flash_train --eval-only --init adapter) vs this checkpoint (same code, no adapter), one RTX PRO 6000, HF transformers 5.17.0",
+        "argmax_agreement": 1.0,
+        "changed_answers": 0,
+        "accuracy_adapter_path": 0.9342,
+        "accuracy_merged": 0.9342,
+        "mean_max_probability_gap_at_T": 0.0019,
+        "max_probability_gap_at_T": 0.0748,
+        "temperature": 1.200767737961694
+      },
+      "status": "ready-to-serve weights; the NVFP4 build above was made from this merge path"
     }
   },
   "public_copy": {
-    "derived_from_sha256": "d55042b1b8d3a0129d59a37a454debb07c15f2e6edda247f55ebcd83916e6214",
-    "changes": "storage locations, cost figures, host and instance details, and internal report and orchestration paths removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
+    "derived_from_sha256": "0129dff3b9e04a5fa4e74b16f3c8abeb4ae76b0cc71f6391d7ed2b1a63f6cba8",
+    "changes": "storage locations, cost figures, host and instance details, internal report and orchestration paths, and results of models other than this release and its untrained base removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
   }
 }

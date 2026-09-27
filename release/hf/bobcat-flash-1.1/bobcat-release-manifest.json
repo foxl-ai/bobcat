@@ -48,7 +48,7 @@
       {
         "arm": "g26_b11_mix",
         "teacher": "teacher11",
-        "train_source": "bobcat1_mixture",
+        "train_source": "teacher_training_mixture",
         "lr": 5e-05,
         "epochs": 1,
         "lora_rank": 64,
@@ -59,7 +59,7 @@
     "corpus_manifest_sha256": "34d1ffcbd8ee10c5ec58320c1905d1bd75a6f9a7c848d5f72fd7249511194200",
     "teachers": {
       "teacher": {
-        "model": "bobcat-1: Qwen3.8-27B + release LoRA 2704495d..., merged BF16, vLLM",
+        "model": "Qwen3.8-27B + Bobcat LoRA 2704495d..., merged BF16, vLLM",
         "temperature": 1.1488982760285609
       },
       "teacher11": {
@@ -67,7 +67,7 @@
         "temperature": 1.1884893953889413
       },
       "logits_sha256": {
-        "teacher_bobcat1": {
+        "teacher": {
           "train": {
             "rows": 447903,
             "sha256": "a20858dd48f0e8ecc876596e95620431259cca6225c8d2f782b893343184bfd3"
@@ -125,15 +125,6 @@
       },
       "nll": 0.28545979981964037,
       "ece": 0.010652558974047242,
-      "vs_bobcat1": {
-        "difference": -0.01348243392833326,
-        "ci95": [
-          -0.02736236863174024,
-          -0.0006648555000579037
-        ],
-        "rows": 3188,
-        "components": 1161
-      },
       "vs_zeroshot_base": {
         "difference": 0.054169775926077746,
         "ci95": [
@@ -1425,6 +1416,6 @@
   },
   "public_copy": {
     "derived_from_sha256": "d4e906958d3ad49726b3c8dd1b196fdc2689f4879e7440e4a8de2e00c2c6185e",
-    "changes": "storage locations, cost figures, host and instance details, and internal report and orchestration paths removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
+    "changes": "storage locations, cost figures, host and instance details, internal report and orchestration paths, and results of models other than this release and its untrained base removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
   }
 }
