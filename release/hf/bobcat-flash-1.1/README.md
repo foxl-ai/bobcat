@@ -52,9 +52,7 @@ most questions on its own and can hand the ones it is unsure about to
 [Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) in the same server. The compiler, servers and evaluation code are at
 [github.com/foxl-ai/bobcat](https://github.com/foxl-ai/bobcat).
 
-![Bobcat Flash choosing an octopus's arm reaches, skin and ink many times a second in a live 3D reef, with each answer and the live decision rate on screen](assets/bobcat-demo.gif)
-
-*Bobcat Flash steering an octopus live: 256 typed decisions/s, 54 ms p50 server-side (40 pre-registered live runs; the clip shows its own session's figures).*
+**Demo:** Bobcat Flash steering an octopus live (256 typed decisions/s, 54 ms p50 server-side over 40 pre-registered live runs) is on the [blog](https://foxl.ai/blog/bobcat-typed-decisions).
 
 ![Bobcat Flash 1.1 at a glance](assets/bobcat-flash-1.1-highlights.png)
 
@@ -63,7 +61,7 @@ most questions on its own and can hand the ones it is unsure about to
 | | Bobcat Flash 1.1 | Reference |
 |---|---:|---|
 | Median time per TypeSafe workflow case, client-side over HTTPS (cold server) | **0.25 s** same datacenter; **0.42 s** from another region | Jev 0.42 s (TypeSafe's published client-side time) |
-| Same, server-side over localhost | **0.297 s** | one RTX PRO 6000 Blackwell, FP8 |
+| Same, server-side over localhost | **0.283 s** | one RTX PRO 6000 Blackwell, FP8 (another host: 0.297 s) |
 | One decision (512 tokens, 8 candidates), p50 | **24.8 ms** engine; **27 ms** client-side, same datacenter | one RTX PRO 6000 Blackwell, FP8, vLLM |
 | TypeSafe's published workflow examples: agreement with the reference (329 questions) | **91.2%** | Jev 90.9%, Claude Opus 5 92.4%, GPT-5.6 Sol 93.0% |
 | SemIf's 102 aligned TypeSafe rows: modal agreement | **0.896** | Jev 0.883 |
@@ -312,12 +310,12 @@ four answered; no request failed or was retried.
 | Agreement with the reference, all questions | 91.2% | 90.9% | 92.4% | 93.0% | 90.0% |
 | Agreement, mean of the four workflows | 85.4% | 86.5% | 88.2% | 89.6% | 82.4% |
 | Probability on the reference answer | 0.862 | 0.850 | 0.851 | 0.914 | 0.899 |
-| Median time per case | 0.297 s | 0.42 s | 20.9 s | 24.2 s | 0.293 s |
+| Median time per case | 0.283 s | 0.42 s | 20.9 s | 24.2 s | 0.293 s |
 
 Flash minus Jev, averaged over workflows, is -1.0 points [-4.6, +4.2]: level on these
 examples, not separated. This is question-level agreement on 20 English cases against a
 frontier-model consensus, not action accuracy or ground truth. Flash's time is server-side
-over localhost HTTP on one RTX PRO 6000 (a second host measured 0.283 s); the other times
+over localhost HTTP on one RTX PRO 6000 (another host measured 0.297 s); the other times
 are TypeSafe's published client-side times with the network included.
 
 ### SemIf benchmark bundle
@@ -380,7 +378,7 @@ never truncated.
 | 3.2k-token state, 8 questions, one batch, p50 | 196 ms |
 | 8K / 16K tokens, 1 question, p50 | 272 / 682 ms |
 | Throughput, independent 1K-token requests | 48,750 tokens/s |
-| TypeSafe workflow case, served over localhost HTTP: median / mean / Invoice median | 0.297 / 0.62 / 1.50 s |
+| TypeSafe workflow case, served over localhost HTTP: median / mean / Invoice median | 0.283 / 0.60 / 1.50 s (another host: 0.297 / 0.62 / 1.50 s) |
 
 The same architecture, measured with a checkpoint from the first training stage, took 15.9 ms (first profile) and
 0.185 s per workflow case on one H200, and 13.7 ms and 0.226 s on one B200.
