@@ -28,12 +28,12 @@
 
 ---
 
-![Bobcat at a glance. Left, accuracy against the same base model zero-shot on identical inputs: sealed final (four tasks, 1,614 decisions) 94.3% against 87.9%, six-task development 93.7% against 85.5%, TypeSafe's workflow examples 92.1% against 86.9%, SemIf TypeSafe 102 87.2% against 82.0%, SemIf authored 144 91.0% against 87.6%. Right, agreement with TypeSafe's reference against median time per case on TypeSafe's 20 published workflow examples: Jev 90.9% at 0.42 s, Bobcat 92.1% (evaluation path) at 0.56 s (same architecture, from a client in the same datacenter, measured before the released checkpoint), Claude Opus 5 92.4% at 20.9 s, GPT-5.6 Sol 93.0% at 24.2 s. One decision takes 42.8 ms at the median on one RTX PRO 6000 in NVFP4.](assets/readme/bobcat-at-a-glance.png)
+![Bobcat at a glance. Left, accuracy against the same base model zero-shot on identical inputs: four-task sealed final 94.3% against 87.9%, six-task development 93.7% against 85.5%, TypeSafe's workflow examples 92.1% against 86.9%, SemIf TypeSafe 102 87.2% against 82.0%, SemIf authored 144 91.0% against 87.6%. Right, agreement with TypeSafe's reference against median time per case on TypeSafe's 20 published workflow examples, log time axis: Jev 90.9% at 0.42 s client-side as published, Bobcat 92.1% agreement from the evaluation path at 0.56 s client-side from the same datacenter on the same architecture before the released checkpoint, Claude Opus 5 92.4% at 20.9 s, GPT-5.6 Sol 93.0% at 24.2 s. One decision takes 42.8 ms at the median server-side on one RTX PRO 6000 in NVFP4.](assets/readme/bobcat-at-a-glance.png)
 
-<sub>Right-hand chart: Bobcat's point pairs the released model's agreement on the evaluation path (92.1%) with
-the median time per case from a client in the same datacenter on the same architecture and serving setup,
-measured before the released checkpoint (0.56 s). The released checkpoint served in NVFP4 agrees on 91.2% at
-0.52-0.58 s per case, server-side.</sub>
+<sub>Left: Bobcat vs Qwen3.8-27B zero-shot, identical inputs. Right: agreement with the mean of GPT-6 Astra and Claude
+Fable 5.1 (329 questions); Jev, Opus 5 and Sol: TypeSafe's published answers and client-side times. Bobcat: the
+released model on the BF16 evaluation path; time client-side, same datacenter, on the same architecture and NVFP4
+setup before the released checkpoint. The released NVFP4 server: 91.2% at 0.58 s per case, server-side.</sub>
 
 Bobcat reads a state (text or JSON), your questions and the answers you allow, and returns
 typed decisions your code can threshold. It reads the logits of the offered candidates at

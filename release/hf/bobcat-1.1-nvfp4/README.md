@@ -48,6 +48,7 @@ uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi 
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
+# These weights (20.6 GB), then the typed-decision server
 $PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1-nvfp4', local_dir='bobcat-1.1-nvfp4')"
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model bobcat-1.1-nvfp4 \
   --compiler-model bobcat-1.1-nvfp4/compiler --quantization none --temperature 1.2008 \
