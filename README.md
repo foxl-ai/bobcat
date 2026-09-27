@@ -16,8 +16,15 @@
 </p>
 
 <p align="center">
+  Read the announcement and full technical write-up:
+  <a href="https://foxl.ai/blog/bobcat-typed-decisions"><strong>foxl.ai/blog/bobcat-typed-decisions</strong></a>
+</p>
+
+<p align="center">
   <a href="https://huggingface.co/sanghwa-na/bobcat-1.1">Bobcat 1.1</a> &nbsp;·&nbsp;
+  <a href="https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4">Bobcat 1.1 NVFP4</a> &nbsp;·&nbsp;
   <a href="https://huggingface.co/sanghwa-na/bobcat-flash-1.1">Bobcat Flash 1.1</a> &nbsp;·&nbsp;
+  <a href="https://huggingface.co/spaces/sanghwa-na/bobcat">Try it in the Space</a> &nbsp;·&nbsp;
   <a href="#quickstart">Quickstart</a>
 </p>
 
@@ -53,8 +60,10 @@ on its untrained base. Flash answers most questions itself; in one server
 The weights are ready to serve: each repository holds the trained model merged into its
 base (BF16), served in FP8 by vLLM, and Bobcat 1.1 also comes as the NVFP4 checkpoint behind
 its latency figures (Blackwell GPUs). The model cards give every number with its conditions
-and limits, including the targets that were not met and the negative results. The technical
-report is being revised for these models.
+and limits, including the targets that were not met and the negative results. The
+announcement and full technical write-up is at
+[foxl.ai/blog/bobcat-typed-decisions](https://foxl.ai/blog/bobcat-typed-decisions); the technical report is being revised for these
+models.
 
 ## Quickstart
 

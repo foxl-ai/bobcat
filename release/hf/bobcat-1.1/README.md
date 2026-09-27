@@ -31,6 +31,10 @@ datasets:
 
 # Bobcat 1.1
 
+Read the announcement and full technical write-up: **[foxl.ai/blog/bobcat-typed-decisions](https://foxl.ai/blog/bobcat-typed-decisions)**
+
+**Bobcat 1.1** · [Bobcat 1.1 NVFP4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) · [Bobcat Flash 1.1](https://huggingface.co/sanghwa-na/bobcat-flash-1.1) · [Try it in the Space](https://huggingface.co/spaces/sanghwa-na/bobcat) · [Code on GitHub](https://github.com/foxl-ai/bobcat)
+
 Bobcat is a **typed-decision model**. You send a state (text or JSON) and questions whose
 possible answers you define in the request; Bobcat returns a probability for every answer
 you named, and nothing else. It never generates text: it reads the logits of the offered
@@ -155,7 +159,8 @@ Notes:
   weights, but plain vLLM exposes text generation; the typed-decision contract (closed JSON
   replies, no generated tokens) comes from `bobcat.api_server`.
 - `--quantization fp8` is vLLM's online dynamic FP8 of the BF16 weights. For the NVFP4
-  checkpoint on a Blackwell GPU, download `sanghwa-na/bobcat-1.1-nvfp4` instead and pass
+  checkpoint on a Blackwell GPU, download
+  [sanghwa-na/bobcat-1.1-nvfp4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) instead and pass
   `--model bobcat-1.1-nvfp4 --compiler-model bobcat-1.1-nvfp4/compiler --quantization none`
   (see its card).
 - `--no-config` keeps uv from applying this repository's development settings to the

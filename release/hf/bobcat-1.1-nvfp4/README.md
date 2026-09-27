@@ -19,6 +19,10 @@ tags:
 
 # Bobcat 1.1 NVFP4
 
+Read the announcement and full technical write-up: **[foxl.ai/blog/bobcat-typed-decisions](https://foxl.ai/blog/bobcat-typed-decisions)**
+
+[Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) · **Bobcat 1.1 NVFP4** · [Bobcat Flash 1.1](https://huggingface.co/sanghwa-na/bobcat-flash-1.1) · [Try it in the Space](https://huggingface.co/spaces/sanghwa-na/bobcat) · [Code on GitHub](https://github.com/foxl-ai/bobcat)
+
 A ready-to-serve checkpoint of [Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1),
 the typed-decision model: you send a state and questions whose answers you name, and it
 returns a probability for every answer you named, read from the offered candidates' logits
