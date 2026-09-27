@@ -1412,10 +1412,72 @@
         "same_host_adapter_vs_release_logits_argmax_agreement": 0.9906
       },
       "status": "ready-to-serve weights; the served (FP8) figures of this manifest are this checkpoint's"
+    },
+    "fp8": {
+      "added_at": "2026-09-27T19:40:00Z",
+      "note": "Additive pre-quantized FP8 checkpoint for the Bobcat Flash Space (to be published as sanghwa-na/bobcat-flash-1.1-fp8); the adapter, base revision, tokenizer and every frozen field are unchanged. No sealed final was opened; Jev was not called.",
+      "derived_from": "the merged BF16 checkpoint in merged_bf16 (downloaded from sanghwa-na/bobcat-flash-1.1 and checked against its SHA256SUMS)",
+      "tool": "scripts/fp8_quantize.py (llm-compressor 0.14.0, transformers 5.17.0, torch 2.13.0): FP8_DYNAMIC, float8_e4m3fn weights with one scale per output channel, activations quantized per token at run time (no calibration data); compressed-tensors format (vLLM: --quantization none); the 30 fused expert blocks linearized into one Linear per expert first (11,520 expert projections quantized)",
+      "kept_bf16": "lm_head, embeddings, norms, the 30 routers, the vision tower (205 dense and 11,520 expert projections quantized)",
+      "files_sha256": {
+        "model-00001-of-00002.safetensors": "8e718d943d80d5a9649cc0f29e35d061ccd077f709851610632dd7b89f323efc",
+        "model-00002-of-00002.safetensors": "e0523d3c9c56fa73bf0f3fb7ab56b50860c146da2155ed597fe47b29392ca414",
+        "model.safetensors.index.json": "af4ed77157e6a9b1597771c024d54a6e45b355376b759ae108d45905525c1d5c",
+        "config.json": "391a2e8a83f8148ab20bd7e4b628ff933e448b97b8179913660837abed188073"
+      },
+      "size_bytes": 27200044104,
+      "dev_against_bf16_evaluation_path": {
+        "rows": 3188,
+        "engine": "vLLM 0.30.0, one RTX PRO 6000, --quantization none",
+        "bf16_evaluation_path": {
+          "accuracy": 0.9184,
+          "task_macro": 0.9207
+        },
+        "fp8_checkpoint": {
+          "accuracy": 0.9194,
+          "task_macro": 0.9222
+        },
+        "argmax_agreement": 0.9878,
+        "disagreements": 39,
+        "near_tie_rows": 74,
+        "minus_bf16": 0.0009,
+        "minus_bf16_95ci": [
+          -0.0028,
+          0.0047
+        ]
+      },
+      "space_engine_dev_sample": {
+        "rows": 319,
+        "every": 10,
+        "accuracy": 0.9216,
+        "bf16_evaluation_path_accuracy": 0.9091,
+        "argmax_agreement_with_bf16": 0.9781,
+        "vllm_fp8_checkpoint_agreement_with_bf16": 0.9937
+      },
+      "typesafe20_served": {
+        "server": "bobcat.flash_server --quantization none, vLLM 0.30.0, one RTX PRO 6000, localhost HTTP",
+        "agreement_common": 0.9088,
+        "workflow_macro": 0.8548,
+        "questions": 329,
+        "failed_requests": 0
+      },
+      "w1_p50_ms": 24.6,
+      "space": {
+        "resident_gib": 24.3,
+        "peak_gib_27k_preset": 42.03,
+        "preset_warm_ms": {
+          "27k": 6766,
+          "short": [
+            198,
+            510
+          ]
+        }
+      },
+      "status": "a different numerical artifact from the evaluated adapter; the figures above are its own"
     }
   },
   "public_copy": {
-    "derived_from_sha256": "d4e906958d3ad49726b3c8dd1b196fdc2689f4879e7440e4a8de2e00c2c6185e",
+    "derived_from_sha256": "cba911e6f05a57de42ef2b7ee42d6ba7bb33f89c0dfce37fa30dece7253fd62a",
     "changes": "storage locations, cost figures, host and instance details, internal report and orchestration paths, and results of models other than this release and its untrained base removed; the NVFP4 quantizer named by its public path, scripts/nvfp4_quantize.py; nothing else changed"
   }
 }

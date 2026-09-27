@@ -64,7 +64,9 @@ its latency figures (Blackwell GPUs). The model cards give every number with its
 and limits, including the targets that were not met and the negative results.
 
 - **Technical report:** see the [blog post](https://foxl.ai/blog/bobcat-typed-decisions).
-- **Try it:** both models run in the [Bobcat Space](https://huggingface.co/spaces/sanghwa-na/bobcat), in the browser, with no key.
+- **Try it:** Bobcat 1.1 runs in the [Bobcat Space](https://huggingface.co/spaces/sanghwa-na/bobcat), in the browser, with no key
+  (long states included); Bobcat Flash, the fast tier for short states, in the
+  [Bobcat Flash Space](https://huggingface.co/spaces/sanghwa-na/bobcat-flash).
 - **Demos:** see the [blog post](https://foxl.ai/blog/bobcat-typed-decisions).
 
 ## Quickstart

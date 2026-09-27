@@ -34,7 +34,7 @@ datasets:
 
 Technical write-up: **[foxl.ai/blog/bobcat-typed-decisions](https://foxl.ai/blog/bobcat-typed-decisions)**
 
-[Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) · [Bobcat 1.1 NVFP4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) · **Bobcat Flash 1.1** · [Try it in the Space](https://huggingface.co/spaces/sanghwa-na/bobcat) · [Code on GitHub](https://github.com/foxl-ai/bobcat)
+[Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) · [Bobcat 1.1 NVFP4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) · **Bobcat Flash 1.1** · [Try it in the Space](https://huggingface.co/spaces/sanghwa-na/bobcat-flash) · [Code on GitHub](https://github.com/foxl-ai/bobcat)
 
 Bobcat Flash is the fast tier of Bobcat, a **typed-decision model**. You send a state (text
 or JSON) and questions whose possible answers you define in the request; Flash returns a

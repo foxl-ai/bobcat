@@ -1,0 +1,17 @@
+Bobcat 1.1 FP8 (sanghwa-na/bobcat-1.1-fp8)
+Copyright 2026 The Bobcat Authors
+
+This checkpoint is Bobcat 1.1 (sanghwa-na/bobcat-1.1: the Bobcat 1.1 LoRA adapter merged into
+Qwen3.8-27B, Qwen/Qwen3.8-27B at revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0, by the Qwen
+team) quantized to FP8 (FP8_DYNAMIC) with llm-compressor 0.14.0.
+
+Qwen3.8-27B is licensed under the Apache License, Version 2.0. Its LICENSE file is included
+here unchanged as LICENSE, and this derivative is released under the same license. The
+tokenizer, vocabulary, chat template, processor and configuration files are the Qwen team's,
+unchanged apart from the quantization settings in config.json. The files under compiler/ are
+the base model's tokenizer, chat template and configuration at the pinned revision, with the
+download receipt the Bobcat compiler checks.
+
+The adapter's training data keep their own licenses; see THIRD_PARTY.md in
+https://github.com/foxl-ai/bobcat. Bobcat is an independent project and is not affiliated
+with or endorsed by the Qwen team.

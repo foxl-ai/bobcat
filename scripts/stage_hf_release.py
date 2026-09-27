@@ -91,6 +91,24 @@ RELEASES = {
         weight_hashes_path=("serving_artifacts", "merged_bf16", "files_sha256"),
         source_label="google/gemma-4-26B-A4B-it at revision "
                      "4d7ae4984b7db7de8f8457170b3f1a419ee76d52"),
+    # Pre-quantized FP8 checkpoints for the two ZeroGPU Spaces (owner decision 2026-09-27),
+    # made by scripts/fp8_quantize.py from the BF16 repositories above.
+    "bobcat-1.1-fp8": Release(
+        "bobcat-1.1-fp8", "sanghwa-na/bobcat-1.1-fp8",
+        ROOT / "release/hf/bobcat-1.1-fp8/README.md", ROOT / "release/hf/bobcat-1.1-fp8/assets",
+        ROOT / "release/bobcat-1.1-manifest.json", None,
+        ROOT / "release/hf/bobcat-1.1/bobcat-release-manifest.json", kind="weights",
+        weight_hashes_path=("serving_builds", "fp8", "files_sha256"),
+        base_model="sanghwa-na/bobcat-1.1", license_from="compiler",
+        source_label="sanghwa-na/bobcat-1.1 (BF16)"),
+    "bobcat-flash-1.1-fp8": Release(
+        "bobcat-flash-1.1-fp8", "sanghwa-na/bobcat-flash-1.1-fp8",
+        ROOT / "release/hf/bobcat-flash-1.1-fp8/README.md",
+        ROOT / "release/hf/bobcat-flash-1.1-fp8/assets",
+        ROOT / "release/bobcat-flash-1.1-manifest.json", None,
+        ROOT / "release/hf/bobcat-flash-1.1/bobcat-release-manifest.json", kind="weights",
+        weight_hashes_path=("serving_artifacts", "fp8", "files_sha256"),
+        base_model="sanghwa-na/bobcat-flash-1.1", source_label="sanghwa-na/bobcat-flash-1.1 (BF16)"),
 }
 COMPILER_FILES = ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja", "config.json",
                   "bobcat-download.json")
@@ -100,7 +118,8 @@ TOKENIZER_FILES = ("tokenizer.json", "tokenizer_config.json", "chat_template.jin
 SKIPPED_WEIGHT_FILES = {"README.md", ".gitattributes", "bobcat-download.json", "LICENSE",
                         "crc32.txt", "NOTICE", "SHA256SUMS.json", "bobcat-release-manifest.json",
                         "bobcat-identifiers.json"}
-RECEIPT_PATH_FIELDS = {"bobcat-nvfp4.json": "source_model", "bobcat-merge.json": "base"}
+RECEIPT_PATH_FIELDS = {"bobcat-nvfp4.json": "source_model", "bobcat-merge.json": "base",
+                       "bobcat-fp8.json": "source_model"}
 
 # ---------------------------------------------------------------- public manifest
 
