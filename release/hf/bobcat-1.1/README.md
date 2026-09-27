@@ -79,8 +79,8 @@ See [Evaluation](#evaluation) for what each number does and does not mean, and
 - **English as well as Korean.** 36.0% of the training decisions are English, including SNLI
   and SQuAD 2.0.
 - **Insufficient evidence and long inputs.** 6,100 copies whose evidence was removed or
-  swapped, and 1,600 states padded to 8K-32K tokens. These moved the targets less than
-  hoped; see [Limitations](#limitations-and-risks).
+  swapped, and 1,600 states padded to 8K-32K tokens. The insufficient-evidence copies moved
+  that target less than hoped; see [Limitations](#limitations-and-risks).
 
 ## What it does
 
@@ -324,11 +324,16 @@ per task). Change in accuracy against the unpadded state:
 | Unpadded (accuracy) | 93.7% | 86.3% |
 | 8K tokens | 0.0 [-1.9, +1.9] | -0.3 |
 | 16K tokens | -2.7 [-5.0, -0.4] | -2.3 |
-| 30K tokens | **-1.7 [-4.0, +0.7]** | -4.0 |
+| 30K tokens | -1.7 [-4.0, +0.7] | -4.0 |
 | 60K tokens (evaluation path only) | -1.0 [-2.9, +1.0] | -4.3 |
 
 Per task (50 questions each), the drop at 30K is largest in classification (80% to 72%) and search
 (98% to 94%).
+
+On a larger set, 1,200 development questions (drawn per task, disjoint from the 300 above, same
+padding, cluster bootstrap), the change at 30K tokens is **-0.4 points [-1.2, +0.4]**. The gap to
+the 300-question figure (-1.7) is sampling noise. The other lengths were not re-measured on the
+larger set.
 
 ### Latency
 
@@ -396,8 +401,10 @@ on 98.2%). Evaluate the exact artifact you serve.
   definite answer when the evidence is related but does not settle the question. Give it
   an explicit "not stated" option and do not treat a confident answer as proof that the
   evidence exists.
-- **Long states.** Accuracy drops 1.7 points at a 30K-token state (target: at most 1
-  point, not met) and 2.7 points at 16K.
+- **Long states.** At a 30K-token state accuracy changes by -0.4 points [-1.2, +0.4] on
+  1,200 development questions, within the 1-point target (the 300-question set's -1.7 was
+  sampling noise). At 16K the 300-question set shows -2.7 [-5.0, -0.4]; that length was not
+  re-measured on the larger set.
 - **NVFP4 near-ties.** With NVFP4, a question answered from a cached shared prefix and the
   same question computed from scratch agreed on 61 of 64 boundary questions (95.3%; FP8:
   64 of 64). The served NVFP4 build agreed with the reference on 91.2% of TypeSafe's
