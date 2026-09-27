@@ -32,7 +32,7 @@ datasets:
 
 # Bobcat Flash 1.1
 
-Read the announcement and full technical write-up: **[foxl.ai/blog/bobcat-typed-decisions](https://foxl.ai/blog/bobcat-typed-decisions)**
+Technical write-up: **[foxl.ai/blog/bobcat-typed-decisions](https://foxl.ai/blog/bobcat-typed-decisions)**
 
 [Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) · [Bobcat 1.1 NVFP4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4) · **Bobcat Flash 1.1** · [Try it in the Space](https://huggingface.co/spaces/sanghwa-na/bobcat) · [Code on GitHub](https://github.com/foxl-ai/bobcat)
 

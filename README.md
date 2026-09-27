@@ -16,12 +16,10 @@
   <a href="https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4"><img alt="Hugging Face model: bobcat-1.1-nvfp4" src="https://img.shields.io/badge/%F0%9F%A4%97%20Model-bobcat--1.1--nvfp4-ffc107" /></a>
   <a href="https://huggingface.co/sanghwa-na/bobcat-flash-1.1"><img alt="Hugging Face model: bobcat-flash-1.1" src="https://img.shields.io/badge/%F0%9F%A4%97%20Model-bobcat--flash--1.1-ffc107" /></a>
   <a href="https://huggingface.co/spaces/sanghwa-na/bobcat"><img alt="Hugging Face Space: bobcat" src="https://img.shields.io/badge/%F0%9F%A4%97%20Space-bobcat-ffc107" /></a>
-  <a href="https://foxl.ai/blog/bobcat-typed-decisions"><img alt="Blog: foxl.ai" src="https://img.shields.io/badge/blog-foxl.ai-c2410c" /></a>
-  <a href="pyproject.toml"><img alt="Python 3.12 to 3.14" src="https://img.shields.io/badge/python-3.12%E2%80%933.14-3776ab" /></a>
 </p>
 
 <p align="center">
-  <a href="https://foxl.ai/blog/bobcat-typed-decisions">Announcement and technical write-up</a> &nbsp;·&nbsp;
+  <a href="https://foxl.ai/blog/bobcat-typed-decisions">Technical write-up</a> &nbsp;·&nbsp;
   <a href="https://huggingface.co/spaces/sanghwa-na/bobcat">Try it in the browser</a> &nbsp;·&nbsp;
   <a href="#quickstart">Quickstart</a>
 </p>
