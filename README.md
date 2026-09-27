@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://foxl.ai/blog/bobcat-typed-decisions">Technical write-up</a> &nbsp;·&nbsp;
+  <a href="https://foxl.ai/blog/bobcat-typed-decisions#9-demos">See demo videos</a> &nbsp;·&nbsp;
   <a href="https://huggingface.co/spaces/sanghwa-na/bobcat">Try it in the browser</a> &nbsp;·&nbsp;
   <a href="#quickstart">Quickstart</a>
 </p>
