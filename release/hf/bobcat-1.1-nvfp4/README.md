@@ -31,7 +31,8 @@ limitations and the full license notes are on the main card,
 [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1).**
 
 This repository, `sanghwa-na/bobcat-1.1-nvfp4`, is the exact NVFP4 checkpoint we measured and
-served: the BF16 weights of [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1), quantized to NVFP4 (4-bit
+served: a merge of the same Bobcat 1.1 adapter (`7351d959…`) into Qwen3.8-27B at the same revision, by the
+same merge code as [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1), quantized to NVFP4 (4-bit
 weights and activations). It needs an NVIDIA Blackwell GPU (FP4 tensor cores); we measured it
 on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0. For other GPUs, serve the BF16 weights
 of the main repository in FP8, as its quickstart describes.
@@ -100,7 +101,8 @@ near-tie must be reproducible, serve the main repository's BF16 weights in FP8.
 ## Provenance
 
 - **Weights:** the Bobcat 1.1 LoRA (`adapter_model.safetensors` sha256 `7351d959…83b2`)
-  merged into the base, as in [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1).
+  merged into the base by the same code as [sanghwa-na/bobcat-1.1](https://huggingface.co/sanghwa-na/bobcat-1.1)
+  (a separate merge made for this build; its byte identity with those BF16 shards was not checked).
 - **Base:** Qwen3.8-27B at revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`.
 - **Merge:** `bobcat.student_merge`: each adapted weight becomes `bf16(W + (alpha/r) B A)`
   with the product and sum in float32; every other tensor is copied.

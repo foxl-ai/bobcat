@@ -28,7 +28,12 @@
 
 ---
 
-![Bobcat at a glance. Left, accuracy against the same base model zero-shot on identical inputs: sealed final (four tasks, 1,614 decisions) 94.3% against 87.9%, six-task development 93.7% against 85.5%, TypeSafe's workflow examples 92.1% against 86.9%, SemIf TypeSafe 102 87.2% against 82.0%, SemIf authored 144 91.0% against 87.6%. Right, agreement with TypeSafe's reference against median time per case on TypeSafe's 20 published workflow examples: Jev 90.9% at 0.42 s, Bobcat 92.1% at 0.56 s from a client in the same datacenter, Claude Opus 5 92.4% at 20.9 s, GPT-5.6 Sol 93.0% at 24.2 s. One decision takes 42.8 ms at the median on one RTX PRO 6000 in NVFP4.](assets/readme/bobcat-at-a-glance.png)
+![Bobcat at a glance. Left, accuracy against the same base model zero-shot on identical inputs: sealed final (four tasks, 1,614 decisions) 94.3% against 87.9%, six-task development 93.7% against 85.5%, TypeSafe's workflow examples 92.1% against 86.9%, SemIf TypeSafe 102 87.2% against 82.0%, SemIf authored 144 91.0% against 87.6%. Right, agreement with TypeSafe's reference against median time per case on TypeSafe's 20 published workflow examples: Jev 90.9% at 0.42 s, Bobcat 92.1% (evaluation path) at 0.56 s (same architecture, from a client in the same datacenter, measured before the released checkpoint), Claude Opus 5 92.4% at 20.9 s, GPT-5.6 Sol 93.0% at 24.2 s. One decision takes 42.8 ms at the median on one RTX PRO 6000 in NVFP4.](assets/readme/bobcat-at-a-glance.png)
+
+<sub>Right-hand chart: Bobcat's point pairs the released model's agreement on the evaluation path (92.1%) with
+the median time per case from a client in the same datacenter on the same architecture and serving setup,
+measured before the released checkpoint (0.56 s). The released checkpoint served in NVFP4 agrees on 91.2% at
+0.52-0.58 s per case, server-side.</sub>
 
 Bobcat reads a state (text or JSON), your questions and the answers you allow, and returns
 typed decisions your code can threshold. It reads the logits of the offered candidates at
@@ -47,8 +52,8 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 | **Bobcat Flash 1.1** | [bobcat-flash-1.1](https://huggingface.co/sanghwa-na/bobcat-flash-1.1) (BF16) | Gemma 4 26B-A4B | 92.21% | not run | 91.2% (served FP8) | **0.283 s** (FP8) | **24.8 ms** (FP8) |
 
 Measured on one RTX PRO 6000 Blackwell 96 GB with vLLM 0.30.0: times per case are
-server-side over localhost HTTP (0.56 s for Bobcat 1.1 from a client in the same
-datacenter, measured on the same setup before the released checkpoint), and one decision is 512 tokens with 8 candidates in the vLLM engine. On the same
+server-side over localhost HTTP (0.56 s on the same architecture and serving setup from a
+client in the same datacenter, measured before the released checkpoint), and one decision is 512 tokens with 8 candidates in the vLLM engine. On the same
 20 workflow examples Jev agrees with the reference on 90.9% at 0.42 s per case (TypeSafe's
 published client-side time; Jev was never called). A wrong answer named inside the state wins
 7.8% of attacks on Bobcat 1.1 and 21.0% on its untrained base. Flash answers most questions
@@ -77,7 +82,7 @@ uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi 
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
-# The weights (about 54 GB), then the typed-decision server on vLLM
+# The weights (about 56 GB), then the typed-decision server on vLLM
 # (TypeSafe-compatible /v1/systemone and /v1/models), FP8 at load
 $PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1', local_dir='bobcat-1.1')"
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model bobcat-1.1 \

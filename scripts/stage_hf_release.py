@@ -124,6 +124,8 @@ REWRITES = (
     (re.compile(r"Flash corpus / Bobcat\s1 mixture 51"), "the Flash corpus 51"),
     (re.compile(r"\s*\(Bobcat\s1 39/85\)"), " (untrained base 58/85)"),
     (re.compile(r"is unchanged\sfrom the frozen file"), "is identical to the frozen file"),
+    # The ready-to-serve Flash weights were published under the adapter's name, not "-merged".
+    (re.compile(r"sanghwa-na/bobcat-flash-1\.1-merged"), "sanghwa-na/bobcat-flash-1.1"),
 )
 # Named so a hit can be reported without echoing the text around it.
 BLOCKED = {

@@ -52,7 +52,7 @@ most questions on its own and can hand the ones it is unsure about to
 [Bobcat 1.1](https://huggingface.co/sanghwa-na/bobcat-1.1) in the same server. The compiler, servers and evaluation code are at
 [github.com/foxl-ai/bobcat](https://github.com/foxl-ai/bobcat).
 
-**Demo:** Bobcat Flash steering an octopus live (256 typed decisions/s, 54 ms p50 server-side over 40 pre-registered live runs) is on the [blog](https://foxl.ai/blog/bobcat-typed-decisions).
+**Demo:** Bobcat Flash steering an octopus live is on the [blog](https://foxl.ai/blog/bobcat-typed-decisions). Across its 40 pre-registered live runs it made 256 typed decisions a second at 54 ms p50, from a client in the same datacenter.
 
 ![Bobcat Flash 1.1 at a glance](assets/bobcat-flash-1.1-highlights.png)
 
@@ -68,7 +68,7 @@ most questions on its own and can hand the ones it is unsure about to
 | Six-task development evaluation (3,188 decisions) | **92.07%** | same base zero-shot 86.6% (+5.4 pt [+3.7, +7.2]) |
 | Sealed final, four tasks (1,614 decisions, opened once) | **92.21%** | the base was not run on this split |
 | Wrong answer named inside the state wins (300 questions x 3 attacks) | **9.7%** | served FP8; the base was not run on this test |
-| Routed server, development split (Flash first; unsure, out-of-range and over-2,048-token questions to Bobcat 1.1) | **93.15%**, 84.0% answered by Flash | Bobcat 1.1 alone 93.54% |
+| Routed server, development split (Flash first; unsure, out-of-range and over-2,048-token questions to Bobcat 1.1) | **93.15%**, 84.0% answered by Flash | Bobcat 1.1 alone (NVFP4, served) 93.54% |
 | Same, states padded to 8K / 16K / 30K tokens | **equal to Bobcat 1.1 alone** (92.0 / 91.3 / 92.7%) | Flash alone -7.3 pt at 30K |
 
 Jev, Opus 5 and Sol figures are TypeSafe's own published answers and times; Jev was never
@@ -193,8 +193,8 @@ questions) below, from the confidence rule, which the length rule does not touch
 This is the configuration we measured and serve: one 96 GB Blackwell GPU (RTX PRO 6000),
 Flash in FP8 with 40% of GPU memory and Bobcat 1.1 as its ready-to-serve NVFP4 checkpoint
 ([sanghwa-na/bobcat-1.1-nvfp4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4)) with
-46%. `nvidia-smi` showed about 82,500 MiB in use once both engines had started and 86,500
-MiB after the measurements below, of 97,887 MiB. A BF16 merge of Bobcat 1.1 (about 54 GB) does not fit in its 46% share,
+46%. `nvidia-smi` showed about 82,000 MiB in use once both engines had started and 86,500
+MiB after the measurements below, of 97,887 MiB. The BF16 weights of Bobcat 1.1 (about 56 GB) do not fit in its 46% share,
 and serving both models in FP8 has not been measured with this server.
 
 ```bash
@@ -310,12 +310,13 @@ four answered; no request failed or was retried.
 | Agreement with the reference, all questions | 91.2% | 90.9% | 92.4% | 93.0% | 90.0% |
 | Agreement, mean of the four workflows | 85.4% | 86.5% | 88.2% | 89.6% | 82.4% |
 | Probability on the reference answer | 0.862 | 0.850 | 0.851 | 0.914 | 0.899 |
-| Median time per case | 0.283 s | 0.42 s | 20.9 s | 24.2 s | 0.293 s |
+| Median time per case | 0.297 s | 0.42 s | 20.9 s | 24.2 s | 0.293 s |
 
 Flash minus Jev, averaged over workflows, is -1.0 points [-4.6, +4.2]: level on these
 examples, not separated. This is question-level agreement on 20 English cases against a
 frontier-model consensus, not action accuracy or ground truth. Flash's time is server-side
-over localhost HTTP on one RTX PRO 6000 (another host measured 0.297 s); the other times
+over localhost HTTP on one RTX PRO 6000, in the same run as the agreement figures (a later run on
+another host measured 0.283 s, with a workflow mean of 85.6%); the other times
 are TypeSafe's published client-side times with the network included.
 
 ### SemIf benchmark bundle
@@ -377,7 +378,7 @@ never truncated.
 | 512 tokens, 8 candidates, 1 question, p50 / p95 | 24.8 / 25.2 ms |
 | 3.2k-token state, 8 questions, one batch, p50 | 196 ms |
 | 8K / 16K tokens, 1 question, p50 | 272 / 682 ms |
-| Throughput, independent 1K-token requests | 48,750 tokens/s |
+| Throughput, independent 1K-token requests (release benchmark) | 48,750 tokens/s |
 | TypeSafe workflow case, served over localhost HTTP: median / mean / Invoice median | 0.283 / 0.60 / 1.50 s (another host: 0.297 / 0.62 / 1.50 s) |
 
 The same architecture, measured with a checkpoint from the first training stage, took 15.9 ms (first profile) and
@@ -414,7 +415,7 @@ byte-identical to the merge behind every served figure on this card.
 
 Served in FP8, Flash gives the evaluation path's answer on 98.4% of development questions (task
 macro 92.1% to 91.8%). An NVFP4 build (every expert quantized) was **slower and less
-accurate** on this GPU: 44,012 against 48,594 tokens/s, -0.68 points [-1.59, +0.14] on
+accurate** on this GPU: 44,012 against 48,594 tokens/s (512 concurrent requests, another session), -0.68 points [-1.59, +0.14] on
 development and 89.1% against 91.2% on TypeSafe's workflows. Serve FP8.
 
 ## Training and distillation

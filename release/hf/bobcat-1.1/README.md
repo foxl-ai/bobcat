@@ -62,7 +62,7 @@ The compiler, server and evaluation code are at
 | TypeSafe's published workflow examples: agreement with the reference (329 questions) | **92.1%** | Jev 90.9%, Claude Opus 5 92.4%, GPT-5.6 Sol 93.0% |
 | SemIf's 102 aligned TypeSafe rows: modal agreement | **0.872** | Jev 0.883 |
 | One decision (512 tokens, 8 candidates), p50 | **42.8 ms** | one RTX PRO 6000 Blackwell, NVFP4, vLLM engine |
-| Median time per TypeSafe workflow case, served | **0.52-0.58 s** | Jev 0.42 s (TypeSafe's published client-side time) |
+| Median time per TypeSafe workflow case, server-side over localhost (NVFP4) | **0.52-0.58 s** | Jev 0.42 s (TypeSafe's published client-side time, network included) |
 
 Jev, Opus 5 and Sol figures are TypeSafe's own published answers and times; Jev was never
 called. The same-base baseline is untrained Qwen3.8-27B with the same compiler and readout.
@@ -110,7 +110,7 @@ official `typesafe-sdk` works against a Bobcat server by changing its base URL.
 ## Quickstart: serve Bobcat 1.1 on one GPU
 
 The staged files of this repository were load-tested on one RTX PRO 6000 Blackwell 96 GB with
-vLLM 0.30.0 by the commands below (the download line runs once the repository is public):
+vLLM 0.30.0 by the commands below:
 `vllm serve` came up and listed the model; the Bobcat server was ready two minutes after it
 started, answered `/health`, the SDK example below answered `payments`, and TypeSafe's 20
 workflow cases agreed with the reference on 92.1% of 329 questions (no failed request; the
@@ -126,7 +126,7 @@ uv pip install --no-config --python .venv-serve/bin/python vllm==0.30.0 fastapi 
   "tokenizers>=0.21" huggingface_hub typesafe-sdk==0.7.1
 export PYTHONPATH=$PWD/src PY=.venv-serve/bin/python
 
-# These weights (about 54 GB), then the typed-decision server
+# These weights (about 56 GB), then the typed-decision server
 # (TypeSafe-compatible /v1/systemone and /v1/models), FP8 at load
 $PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1', local_dir='bobcat-1.1')"
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.api_server --engine vllm --model bobcat-1.1 \
@@ -188,8 +188,9 @@ Notes:
 These are ordinary GPU Linux hosts; the Quickstart above is the whole recipe.
 
 - **Amazon EC2.** One RTX PRO 6000 Blackwell 96 GB (for example `g7e.2xlarge`) serves these
-  weights in FP8 or the NVFP4 checkpoint; in FP8 they also fit one L40S 48 GB (for example
-  `g6e.2xlarge`) with up to 128 concurrent sequences. Use a Deep Learning AMI with a recent
+  weights in FP8 or the NVFP4 checkpoint. The same architecture also ran in FP8 on one L40S
+  48 GB (for example `g6e.2xlarge`) with up to 128 concurrent sequences before release; this
+  checkpoint was not tested there. Use a Deep Learning AMI with a recent
   NVIDIA driver, and allow about 80 GB of disk for the download and caches.
 - **Amazon SageMaker AI.** The same commands run in a JupyterLab space or notebook
   instance of an equivalent GPU type (for example `ml.g6e.2xlarge`). A SageMaker real-time
@@ -345,8 +346,8 @@ larger set.
 | Throughput, 32 to 512 concurrent 1K-token requests | 19,207-19,614 tokens/s |
 | TypeSafe workflow case, median, served over HTTP (localhost, `--schedule all`) | 0.576 s / 0.515 s (two passes) |
 
-In FP8 (option B), the fresh-install server took 0.86 s per TypeSafe workflow case on the
-same GPU; the FP8 engine profile was not measured separately. Latency under concurrent HTTP
+In FP8, the served checkpoint took 0.85 s per TypeSafe workflow case on the same GPU (the
+load test of these files, above); the FP8 engine profile was not measured separately. Latency under concurrent HTTP
 load has not been measured.
 
 ### Serving precision
