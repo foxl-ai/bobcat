@@ -188,7 +188,9 @@ Notes:
   and never truncates them.
 - The compiler reads its identifier list from the repository
   (`reports/2026-09-22-glm-readout-preflight.json`), so run the server from the repository
-  root. The same list is included here as `bobcat-identifiers.json`.
+  root, or pass `--identifiers adapter/bobcat-identifiers.json` (with option A,
+  `bobcat-flash-1.1-merged/bobcat-identifiers.json`): the same list, in the same
+  format, ships in this repository.
 
 ## Routing to Bobcat 1.1
 
@@ -219,19 +221,28 @@ qualified). A separate 300-question development holdout was scored for the recor
 not change it: at 3K-8K it matches Bobcat 1.1; unpadded and at 1K it is 1.3 points (4 of 300
 questions) below, from the confidence rule, which the length rule does not touch there.
 
+This is the configuration we measured and serve: one 96 GB Blackwell GPU (RTX PRO 6000),
+Flash in FP8 with 40% of GPU memory and Bobcat 1.1 as its ready-to-serve NVFP4 checkpoint
+([sanghwa-na/bobcat-1.1-nvfp4](https://huggingface.co/sanghwa-na/bobcat-1.1-nvfp4)) with
+46%. `nvidia-smi` showed about 82,500 MiB in use once both engines had started and 86,500
+MiB after the measurements below, of 97,887 MiB. A BF16 merge of Bobcat 1.1 (about 54 GB) does not fit in its 46% share,
+and serving both models in FP8 has not been measured with this server.
+
 ```bash
-# Flash as above (model/, base/); Bobcat 1.1 merged as in its card (b11-model/, b11-compiler/)
+# Flash as in option A or B above (model/ with base/, or bobcat-flash-1.1-merged/ with its
+# compiler/); Bobcat 1.1 as the ready-to-serve NVFP4 checkpoint:
+$PY -c "from huggingface_hub import snapshot_download as s; s('sanghwa-na/bobcat-1.1-nvfp4', local_dir='bobcat-1.1-nvfp4')"
 VLLM_USE_FLASHINFER_SAMPLER=0 $PY -m bobcat.route_server \
   --flash-model model --flash-compiler-model base --flash-temperature 0.8912 \
   --flash-quantization fp8 --flash-gpu-memory-utilization 0.40 \
-  --big-model b11-model --big-compiler-model b11-compiler --big-temperature 1.2008 \
-  --big-gpu-memory-utilization 0.46 --max-flash-tokens 2048 --max-model-len 32832 \
-  --schedule all --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
+  --big-model bobcat-1.1-nvfp4 --big-compiler-model bobcat-1.1-nvfp4/compiler \
+  --big-quantization none --big-temperature 1.2008 --big-gpu-memory-utilization 0.46 \
+  --max-flash-tokens 2048 --max-model-len 32832 --schedule all \
+  --engine-arg max_num_batched_tokens=16384 --host 127.0.0.1 --port 8000 --local
 ```
 
-Measured with Flash in FP8 and the released Bobcat 1.1 in an NVFP4 build
-(`--big-quantization none` on a checkpoint made with `scripts/nvfp4_quantize.py`), one
-request at a time over loopback HTTP on the server host:
+Measured with Flash in FP8 and that NVFP4 checkpoint (`model.safetensors` sha256
+`2ea6716e…73c9`), one request at a time over loopback HTTP on the server host:
 
 | Input (Flash tokens) | Questions | **Routed** | Flash alone | Bobcat 1.1 alone | Answered by Flash | Latency p50: routed / Flash / Bobcat 1.1 |
 |---|---:|---:|---:|---:|---:|---|
@@ -261,7 +272,7 @@ client-side, see [Latency](#latency)) and keep long states off it.
 These are ordinary GPU Linux hosts; the Quickstart above is the whole recipe.
 
 - **Amazon EC2.** One RTX PRO 6000 Blackwell 96 GB (for example `g7e.2xlarge`) serves the
-  FP8 merge, and holds Flash and Bobcat 1.1 together for the routed server. Use a Deep
+  FP8 merge, and holds Flash and Bobcat 1.1 (NVFP4) together for the routed server. Use a Deep
   Learning AMI with a recent NVIDIA driver, and allow about 120 GB of disk for Flash alone
   (base download plus the merged copy), about 200 GB more with Bobcat 1.1.
 - **Amazon SageMaker AI.** The same commands run in a JupyterLab space or notebook

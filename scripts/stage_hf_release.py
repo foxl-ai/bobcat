@@ -102,7 +102,11 @@ RELEASES = {
 COMPILER_FILES = ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja", "config.json",
                   "bobcat-download.json")
 TOKENIZER_FILES = ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja")
-SKIPPED_WEIGHT_FILES = {"README.md", ".gitattributes", "bobcat-download.json", "LICENSE"}
+# Never copied from a weights folder: upstream cards and receipts, and the files the stager
+# itself writes (so a staged package can be restaged from its own weights).
+SKIPPED_WEIGHT_FILES = {"README.md", ".gitattributes", "bobcat-download.json", "LICENSE",
+                        "NOTICE", "SHA256SUMS.json", "bobcat-release-manifest.json",
+                        "bobcat-identifiers.json"}
 RECEIPT_PATH_FIELDS = {"bobcat-nvfp4.json": "source_model", "bobcat-merge.json": "base"}
 
 # ---------------------------------------------------------------- public manifest
@@ -346,9 +350,11 @@ def stage_weights(release: Release, weights_dir: Path, compiler_dir: Path, out: 
 
 
 def write_identifiers(out: Path) -> None:
+    # The key every loader reads (bobcat.api_server.load_compiler and the other servers), so
+    # `--identifiers bobcat-identifiers.json` works from the downloaded package.
     identifiers = json.loads(IDENTIFIERS.read_text())["identifiers"]
     (out / "bobcat-identifiers.json").write_text(json.dumps(
-        {"glm_preferred_identifiers": identifiers,
+        {"identifiers": identifiers,
          "note": "Bobcat keeps these where they are single ordinary tokens of the base "
                  "tokenizer, then extends with fixed Greek/Cyrillic/Hebrew/Latin-1/"
                  "Armenian/Georgian letters (bobcat.student_readout.identifier_scheme)."},

@@ -214,7 +214,9 @@ Notes:
   long-input figures below before relying on it.
 - The compiler reads its identifier list from the repository
   (`reports/2026-09-22-glm-readout-preflight.json`), so run the server from the repository
-  root. The same list is included here as `bobcat-identifiers.json`.
+  root, or pass `--identifiers adapter/bobcat-identifiers.json` (with option A,
+  `bobcat-1.1-nvfp4/bobcat-identifiers.json`): the same list, in the same
+  format, ships in this repository.
 - **NVFP4 (Blackwell GPUs).** The latency figures below come from an NVFP4 W4A4 build of
   the merged model made with `scripts/nvfp4_quantize.py` (llm-compressor 0.14.0, 256
   compiled development prompts). That build is not published here; FP8 gives the same

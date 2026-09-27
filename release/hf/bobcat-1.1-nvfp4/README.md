@@ -57,7 +57,8 @@ Then call it with the official `typesafe-sdk` as on the main card
 - `--compiler-model .../compiler` points the Bobcat compiler at the base model's pinned
   tokenizer, template and configuration; it checks them against the receipt in that folder.
   Run the server from the repository root, where the identifier list lives
-  (`reports/2026-09-22-glm-readout-preflight.json`; also here as `bobcat-identifiers.json`).
+  (`reports/2026-09-22-glm-readout-preflight.json`), or pass
+  `--identifiers bobcat-1.1-nvfp4/bobcat-identifiers.json`: the same list ships here.
 - `vllm serve bobcat-1.1-nvfp4 --max-model-len 16448` also loads the checkpoint, but plain
   vLLM exposes text generation; the typed-decision contract (closed JSON replies, no
   generated tokens) comes from `bobcat.api_server`.

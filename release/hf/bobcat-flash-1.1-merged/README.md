@@ -61,7 +61,8 @@ the routed server that sends unsure and long questions to Bobcat 1.1, pass this 
 - `--compiler-model .../compiler` points the Bobcat compiler at the base model's pinned
   tokenizer, template and configuration; it checks them against the receipt in that folder.
   Run the server from the repository root, where the identifier list lives
-  (`reports/2026-09-22-glm-readout-preflight.json`; also here as `bobcat-identifiers.json`).
+  (`reports/2026-09-22-glm-readout-preflight.json`), or pass
+  `--identifiers bobcat-flash-1.1-merged/bobcat-identifiers.json`: the same list ships here.
 - `vllm serve bobcat-flash-1.1-merged --quantization fp8 --max-model-len 32832` also loads the
   checkpoint, but plain vLLM exposes text generation; the typed-decision contract (closed JSON
   replies, no generated tokens) comes from the Bobcat servers.

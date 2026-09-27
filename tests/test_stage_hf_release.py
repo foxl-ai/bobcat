@@ -111,7 +111,8 @@ def test_stage_writes_the_package(tmp_path):
     assert (out / "bobcat-release-manifest.json").read_text() == \
         release.public_manifest.read_text()
     assert (out / "assets/fig.png").read_bytes() == b"png"
-    assert json.loads((out / "bobcat-identifiers.json").read_text())["glm_preferred_identifiers"]
+    staged = json.loads((out / "bobcat-identifiers.json").read_text())
+    assert staged["identifiers"] == json.loads(shr.IDENTIFIERS.read_text())["identifiers"]
     sums = json.loads((out / "SHA256SUMS.json").read_text())
     assert set(sums) == {"adapter_model.safetensors", "adapter_config.json", "README.md",
                          "bobcat-release-manifest.json", "assets/fig.png",
@@ -265,3 +266,25 @@ def test_stage_weights_refuses_changed_weights_or_tokenizer(tmp_path):
         with pytest.raises(SystemExit, match=expected):
             shr.stage_weights(release, weights, base, root / "out")
         assert not (root / "out").exists()
+
+
+def test_the_staged_identifier_list_is_what_the_servers_read(tmp_path, monkeypatch):
+    """`--identifiers bobcat-identifiers.json` must reach load_compiler's key unchanged."""
+    import sys
+    import types
+
+    shr.write_identifiers(tmp_path)
+    seen = {}
+    fake = types.ModuleType("bobcat.student_readout")
+    fake.identifier_scheme = lambda tokenizer, reserved, preferred: seen.setdefault(
+        "preferred", preferred)
+    fake.StudentCompiler = lambda *args, **kwargs: types.SimpleNamespace(args=args)
+    monkeypatch.setitem(sys.modules, "bobcat.student_readout", fake)
+    tokenizers = pytest.importorskip("tokenizers")
+    tokenizer = tokenizers.Tokenizer(tokenizers.models.WordLevel({"[UNK]": 0}, unk_token="[UNK]"))
+    tokenizer.save(str(tmp_path / "tokenizer.json"))
+    (tmp_path / "bobcat-download.json").write_text(json.dumps({"files": {}}))
+    from bobcat.api_server import load_compiler
+
+    load_compiler(tmp_path, tmp_path / "bobcat-identifiers.json", 100, state_cache=False)
+    assert seen["preferred"] == json.loads(shr.IDENTIFIERS.read_text())["identifiers"]
